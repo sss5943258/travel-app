@@ -4,10 +4,10 @@ import { TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { API_URL } from '../config'
 
-// initialData: 傳入代表編輯模式；null 代表新增模式
-// day, date: 新增時需要
-export default function ScheduleFormModal({ initialData, day, date, onClose, onSaved }) {
-  const isEdit = !!initialData
+// mode: 'add', 'edit', 'addBackup'
+// item: 編輯時傳入原卡片，或是新增備案時傳入主卡片
+export default function ScheduleFormModal({ mode, item, day, date, groupId, altOrder, onClose, onSaved }) {
+  const isEdit = mode === 'edit'
 
   const [form, setForm] = useState({
     attractionName: '',
@@ -20,16 +20,19 @@ export default function ScheduleFormModal({ initialData, day, date, onClose, onS
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (initialData) {
+    if (isEdit && item) {
       setForm({
-        attractionName: initialData.attractionName || '',
-        startTime: initialData.startTime || '',
-        endTime: initialData.endTime || '',
-        remark: initialData.remark || '',
-        googleMapLink: initialData.googleMapLink || '',
+        attractionName: item.attractionName || '',
+        startTime: item.startTime || '',
+        endTime: item.endTime || '',
+        remark: item.remark || '',
+        googleMapLink: item.googleMapLink || '',
       })
+    } else if (mode === 'addBackup' && item) {
+      // 備案自動帶入主行程的時間
+      setForm((prev) => ({ ...prev, startTime: item.startTime || '', endTime: item.endTime || '' }))
     }
-  }, [initialData])
+  }, [isEdit, mode, item])
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -44,22 +47,27 @@ export default function ScheduleFormModal({ initialData, day, date, onClose, onS
     setIsSaving(true)
     setError(null)
     try {
+      const targetDate = isEdit || mode === 'addBackup' ? item.date : date;
+      const targetDay = isEdit || mode === 'addBackup' ? item.day : day;
+
       const body = isEdit
-        ? { action: 'updateSchedule', id: initialData.id, ...form }
-        : { action: 'addSchedule', tripId: 't-3', day, date, ...form }
+        ? { action: 'updateSchedule', id: item.id, ...form }
+        : { action: 'addSchedule', tripId: 't-3', day: targetDay, date: targetDate, groupId, altOrder, ...form }
 
       await fetch(API_URL, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(body),
       })
-      
+
       const newItem = {
         ...form,
-        id: isEdit ? initialData.id : `t3-d${day}-${Date.now()}`,
-        day: isEdit ? initialData.day : day,
-        date: isEdit ? initialData.date : date
+        id: isEdit ? item.id : `t3-d${targetDay}-${Date.now()}`,
+        day: targetDay,
+        date: targetDate,
+        groupId: groupId || undefined,
+        altOrder: altOrder || 0,
+        sortOrder: isEdit ? item.sortOrder : 999
       }
       onSaved(newItem)
     } catch (err) {
@@ -76,9 +84,12 @@ export default function ScheduleFormModal({ initialData, day, date, onClose, onS
           <X size={20} />
         </button>
 
-        <h2 className="modal-title">{isEdit ? '編輯行程' : '新增行程'}</h2>
-        {isEdit && <p className="modal-subtitle">Day {initialData.day} · {initialData.date}</p>}
-        {!isEdit && <p className="modal-subtitle">Day {day} · {date}</p>}
+        <h2 className="modal-title">
+          {mode === 'edit' ? '編輯行程' : mode === 'addBackup' ? '新增彈性備案' : '新增行程'}
+        </h2>
+        {isEdit && <p className="modal-subtitle">Day {item.day} · {item.date}</p>}
+        {mode === 'addBackup' && <p className="modal-subtitle">Day {item.day} · {item.date} (主行程: {item.attractionName})</p>}
+        {mode === 'add' && <p className="modal-subtitle">Day {day} · {date}</p>}
 
         <form className="schedule-form" onSubmit={handleSubmit}>
           <div className="form-group">
@@ -94,7 +105,7 @@ export default function ScheduleFormModal({ initialData, day, date, onClose, onS
 
           <div className="form-group">
             <label>時間</label>
-            <TimePicker.RangePicker 
+            <TimePicker.RangePicker
               format="HH:mm"
               minuteStep={5}
               placeholder={['開始時間', '結束時間']}
@@ -110,10 +121,10 @@ export default function ScheduleFormModal({ initialData, day, date, onClose, onS
                   endTime: dateStrings ? dateStrings[1] : ''
                 }))
               }}
-              style={{ 
-                width: '100%', 
-                padding: '0.6rem 0.85rem', 
-                borderRadius: '10px', 
+              style={{
+                width: '100%',
+                padding: '0.6rem 0.85rem',
+                borderRadius: '10px',
                 border: '1.5px solid rgba(0, 0, 0, 0.12)',
                 background: 'rgba(255, 255, 255, 0.7)',
                 fontSize: '0.95rem'
