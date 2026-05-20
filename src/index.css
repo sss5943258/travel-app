@@ -125,6 +125,16 @@ body::-webkit-scrollbar {
   gap: 1rem;
 }
 
+/* Sortable Group & Drag Handle */
+.sortable-group {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  -webkit-touch-callout: none; /* 防止 iOS 長按跳出選單 */
+  -webkit-user-select: none; /* 防止長按選取文字 */
+  user-select: none;
+}
+
 /* Horizontal Scroll Group */
 .horizontal-scroll {
   display: flex;

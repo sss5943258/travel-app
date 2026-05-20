@@ -10,6 +10,7 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
+  PointerSensor,
   MouseSensor,
   TouchSensor,
   useSensor,
@@ -116,39 +117,27 @@ function SortableGroup({ id, groupItems, onClick, onMap, onEdit, onDelete, onAdd
     zIndex: isDragging ? 10 : 1,
     opacity: isDragging ? 0.8 : 1,
     position: 'relative',
-    WebkitUserSelect: 'none',
-    userSelect: 'none',
-    WebkitTouchCallout: 'none',
+    touchAction: 'pan-x',
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="horizontal-scroll">
-      {groupItems.map((item, idx) => (
-        <div key={item.id} className="card-wrapper">
-          {/* 拖曳把手只放在第一張（主卡片）左上角，不影響其他點擊行為 */}
-          {idx === 0 && (
-            <div
-              {...listeners}
-              style={{
-                position: 'absolute', top: '8px', left: '8px', zIndex: 5,
-                padding: '4px', cursor: 'grab', color: 'rgba(0,0,0,0.25)',
-                touchAction: 'none',
-              }}
-              title="拖曳排序"
-            >
-              ⠿
-            </div>
-          )}
-          <Card
-            item={item}
-            onClick={() => onClick(item)}
-            onMap={(e) => onMap(e, item)}
-            onEdit={() => onEdit(item)}
-            onDelete={() => onDelete(item)}
-            onAddBackup={() => onAddBackup(item)}
-          />
-        </div>
-      ))}
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="sortable-group">
+      {/* 水平捲動區域 — touch-action: pan-x 讓左右滑動生效，上下拖曳交由 dnd-kit */}
+      <div className="horizontal-scroll">
+        {groupItems.map((item, idx) => (
+          <div key={item.id} className="card-wrapper">
+            <Card
+              item={item}
+              altCount={idx === 0 ? groupItems.length - 1 : 0}
+              onClick={() => onClick(item)}
+              onMap={(e) => onMap(e, item)}
+              onEdit={() => onEdit(item)}
+              onDelete={() => onDelete(item)}
+              onAddBackup={() => onAddBackup(item)}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -177,7 +166,7 @@ function App() {
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
