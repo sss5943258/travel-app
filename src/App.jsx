@@ -8,11 +8,9 @@ import './index.css'
 
 import {
   DndContext,
-  closestCenter,
+  closestCorners,
   KeyboardSensor,
   PointerSensor,
-  MouseSensor,
-  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -165,8 +163,7 @@ function App() {
   const [deleteItem, setDeleteItem] = useState(null)
 
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
@@ -177,46 +174,42 @@ function App() {
     const jIdx = journeys.findIndex((j) => j.day === selectedDay)
     if (jIdx === -1) return
 
-    let newGroupOrder = null;
+    const currentJ = journeys[jIdx]
+    const schedule = currentJ.schedule || []
+
+    const groupMap = new Map()
+    schedule.forEach(item => {
+      const gid = item.groupId || item.id
+      if (!groupMap.has(gid)) groupMap.set(gid, [])
+      groupMap.get(gid).push(item)
+    })
+
+    const groupIds = Array.from(groupMap.keys()).sort((gidA, gidB) => {
+      const pA = groupMap.get(gidA).find(i => Number(i.altOrder) === 0) || groupMap.get(gidA)[0]
+      const pB = groupMap.get(gidB).find(i => Number(i.altOrder) === 0) || groupMap.get(gidB)[0]
+      return (pA.sortOrder ?? 999) - (pB.sortOrder ?? 999)
+    })
+
+    const oldIndex = groupIds.indexOf(active.id)
+    const newIndex = groupIds.indexOf(over.id)
+    
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const newGroupOrder = arrayMove(groupIds, oldIndex, newIndex)
+
+    const newSchedule = []
+    newGroupOrder.forEach((gid, index) => {
+      const items = groupMap.get(gid)
+      items.forEach(it => {
+        newSchedule.push({ ...it, sortOrder: index }) // 建立新物件，避免 mutate 原始資料
+      })
+    })
 
     setJourneys((prev) => {
       const draft = [...prev]
-      const currentJ = draft[jIdx]
-      const schedule = currentJ.schedule || []
-
-      const groupMap = new Map()
-      schedule.forEach(item => {
-        const gid = item.groupId || item.id
-        if (!groupMap.has(gid)) groupMap.set(gid, [])
-        groupMap.get(gid).push(item)
-      })
-
-      const groupIds = Array.from(groupMap.keys()).sort((gidA, gidB) => {
-        const pA = groupMap.get(gidA).find(i => i.altOrder === 0) || groupMap.get(gidA)[0]
-        const pB = groupMap.get(gidB).find(i => i.altOrder === 0) || groupMap.get(gidB)[0]
-        return (pA.sortOrder || 999) - (pB.sortOrder || 999)
-      })
-
-      const oldIndex = groupIds.indexOf(active.id)
-      const newIndex = groupIds.indexOf(over.id)
-
-      const newGroupIds = arrayMove(groupIds, oldIndex, newIndex)
-      newGroupOrder = newGroupIds;
-
-      const newSchedule = []
-      newGroupIds.forEach((gid, index) => {
-        const items = groupMap.get(gid)
-        items.forEach(it => {
-          it.sortOrder = index
-          newSchedule.push(it)
-        })
-      })
-
-      draft[jIdx] = { ...currentJ, schedule: newSchedule }
+      draft[jIdx] = { ...draft[jIdx], schedule: newSchedule }
       return draft
     })
-
-    if (!newGroupOrder) return
 
     try {
       await fetch(`${API_URL}`, {
@@ -270,14 +263,14 @@ function App() {
     });
 
     const sortedGroupIds = Array.from(groupMap.keys()).sort((gidA, gidB) => {
-      const pA = groupMap.get(gidA).find(i => i.altOrder === 0) || groupMap.get(gidA)[0];
-      const pB = groupMap.get(gidB).find(i => i.altOrder === 0) || groupMap.get(gidB)[0];
-      return (pA.sortOrder || 999) - (pB.sortOrder || 999);
+      const pA = groupMap.get(gidA).find(i => Number(i.altOrder) === 0) || groupMap.get(gidA)[0];
+      const pB = groupMap.get(gidB).find(i => Number(i.altOrder) === 0) || groupMap.get(gidB)[0];
+      return (pA.sortOrder ?? 999) - (pB.sortOrder ?? 999);
     });
 
     sortedGroupIds.forEach(gid => {
       const gItems = groupMap.get(gid);
-      gItems.sort((a, b) => (a.altOrder || 0) - (b.altOrder || 0));
+      gItems.sort((a, b) => (Number(a.altOrder) || 0) - (Number(b.altOrder) || 0));
       scheduleGroups.push({ id: gid, items: gItems });
     });
   }
@@ -320,7 +313,7 @@ function App() {
 
       <main className="main-content">
         <div className="schedule-list">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
             <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
               {scheduleGroups.map((group) => (
                 <SortableGroup

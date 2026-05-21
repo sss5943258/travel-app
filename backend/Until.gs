@@ -44,6 +44,7 @@ function groupToJourneys(flatData) {
       id: item.id,
       groupId: item.groupId,
       altOrder: item.altOrder,
+      sortOrder: item.sortOrder,
       day,
       date: item.date,
       startTime: item.startTime,

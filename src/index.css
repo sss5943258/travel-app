@@ -147,6 +147,7 @@ body::-webkit-scrollbar {
   /* 左 6% + 右 6% 剛好讓中間 88% 的卡片完美置中 */
   scrollbar-width: none;
   box-sizing: border-box;
+  touch-action: pan-x; /* 備案卡片左右滑動 */
 }
 
 .horizontal-scroll::-webkit-scrollbar {
