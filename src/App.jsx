@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2 } from 'lucide-react'
+import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2, Share2 } from 'lucide-react'
 import ScheduleFormModal from './components/ScheduleFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import { API_URL, TRIP_ID } from './config'
@@ -73,6 +73,54 @@ function CardMenu({ item, onEdit, onDelete, onAddBackup }) {
           </button>
         </div>,
         document.body
+      )}
+    </div>
+  )
+}
+
+// ─── 分享選單元件 ───────────────────────────────────────────────────
+function ShareMenu({ onShareLink, onShareText, onShareCSV }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef(null)
+  const btnRef = useRef(null)
+
+  const handleToggle = (e) => {
+    e.stopPropagation()
+    setOpen(!open)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e) => {
+      if (menuRef.current?.contains(e.target)) return
+      if (btnRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+
+  return (
+    <div className="share-menu-wrap" style={{ position: 'relative' }}>
+      <button ref={btnRef} className="icon-btn share-btn" title="分享行程" onClick={handleToggle}>
+        <Share2 size={20} />
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          className="card-menu-dropdown glass share-dropdown"
+          style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 100 }}
+        >
+          <button className="menu-item" onClick={() => { setOpen(false); onShareLink() }}>
+            分享行程
+          </button>
+          <button className="menu-item" onClick={() => { setOpen(false); onShareText() }}>
+            分享文字行程
+          </button>
+          <button className="menu-item" onClick={() => { setOpen(false); onShareCSV() }}>
+            分享 CSV
+          </button>
+        </div>
       )}
     </div>
   )
@@ -365,10 +413,127 @@ function App() {
     });
   }
 
+  const handleShareLink = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: tripInfo?.name || '我的旅遊計畫',
+        url: window.location.href
+      }).catch(err => console.log('Share canceled or failed:', err))
+    } else {
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => alert('已複製行程連結到剪貼簿！'))
+        .catch(() => alert('複製連結失敗，請手動複製網址。'))
+    }
+  }
+
+  const handleShareText = () => {
+    const text = journeys.map(j => {
+      const dateStr = j.date;
+      const dayHeader = `Day ${j.day} (${dateStr})`;
+      
+      const schedule = j.schedule || [];
+      const groupMap = new Map();
+      schedule.forEach(item => {
+        const gid = item.groupId || item.id;
+        if (!groupMap.has(gid)) groupMap.set(gid, []);
+        groupMap.get(gid).push(item);
+      });
+      
+      const sortedGids = Array.from(groupMap.keys()).sort((gidA, gidB) => {
+        const pA = groupMap.get(gidA).find(i => Number(i.altOrder) === 0) || groupMap.get(gidA)[0];
+        const pB = groupMap.get(gidB).find(i => Number(i.altOrder) === 0) || groupMap.get(gidB)[0];
+        return (pA.sortOrder ?? 999) - (pB.sortOrder ?? 999);
+      });
+      
+      const dayBody = sortedGids.map(gid => {
+        const items = groupMap.get(gid);
+        items.sort((a, b) => (Number(a.altOrder) || 0) - (Number(b.altOrder) || 0));
+        
+        return items.map(item => {
+          const time = item.startTime + (item.endTime ? ` - ${item.endTime}` : '');
+          const prefix = item.altOrder > 0 ? `  [備案 ${item.altOrder}]` : '-';
+          const remarkStr = item.remark ? ` (${item.remark})` : '';
+          return `${prefix} ${time} ${item.attractionName}${remarkStr}`;
+        }).join('\n');
+      }).join('\n');
+      
+      return `${dayHeader}\n${dayBody || '(無行程)'}`;
+    }).join('\n\n');
+    
+    const title = tripInfo?.name || '我的旅遊計畫';
+    const fullText = `--- ${title} ---\n\n${text}`;
+    
+    navigator.clipboard.writeText(fullText)
+      .then(() => alert('已複製文字行程到剪貼簿！'))
+      .catch(() => alert('複製失敗，請重試。'));
+  }
+
+  const handleShareCSV = () => {
+    const headers = ['天數', '日期', '時間', '景點名稱', '是否為備案', '備忘/備註'];
+    const rows = [];
+    
+    journeys.forEach(j => {
+      const schedule = j.schedule || [];
+      const groupMap = new Map();
+      schedule.forEach(item => {
+        const gid = item.groupId || item.id;
+        if (!groupMap.has(gid)) groupMap.set(gid, []);
+        groupMap.get(gid).push(item);
+      });
+      
+      const sortedGids = Array.from(groupMap.keys()).sort((gidA, gidB) => {
+        const pA = groupMap.get(gidA).find(i => Number(i.altOrder) === 0) || groupMap.get(gidA)[0];
+        const pB = groupMap.get(gidB).find(i => Number(i.altOrder) === 0) || groupMap.get(gidB)[0];
+        return (pA.sortOrder ?? 999) - (pB.sortOrder ?? 999);
+      });
+      
+      sortedGids.forEach(gid => {
+        const items = groupMap.get(gid);
+        items.sort((a, b) => (Number(a.altOrder) || 0) - (Number(b.altOrder) || 0));
+        
+        items.forEach(item => {
+          const time = item.startTime + (item.endTime ? ` - ${item.endTime}` : '');
+          rows.push([
+            `Day ${j.day}`,
+            j.date,
+            time,
+            item.attractionName,
+            item.altOrder > 0 ? `是 (備案 ${item.altOrder})` : '否',
+            item.remark || ''
+          ]);
+        });
+      });
+    });
+    
+    const csvContent = [
+      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${tripInfo?.name || 'travel_plan'}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   return (
     <div className="app-container">
       <header className="header glass">
-        <h1 className="title">{tripInfo?.name || '我的旅遊計畫'}</h1>
+        <div className="header-top">
+          <h1 className="title" title={tripInfo?.name || '我的旅遊計畫'}>
+            {tripInfo?.name || '我的旅遊計畫'}
+          </h1>
+          <ShareMenu
+            onShareLink={handleShareLink}
+            onShareText={handleShareText}
+            onShareCSV={handleShareCSV}
+          />
+        </div>
         <div className="date-selector">
           {journeys.map((j) => (
             <button
