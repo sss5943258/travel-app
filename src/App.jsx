@@ -10,7 +10,8 @@ import {
   DndContext,
   closestCorners,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -108,6 +109,77 @@ function Card({ item, onClick, onMap, onEdit, onDelete, onAddBackup }) {
 // ─── 可拖曳的群組元件 (包覆卡片與備案) ──────────────────────────────────
 function SortableGroup({ id, groupItems, onClick, onMap, onEdit, onDelete, onAddBackup }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const containerRef = useRef(null)
+
+  const handleRef = (node) => {
+    setNodeRef(node)
+    containerRef.current = node
+  }
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    let timer = null
+    let touchActionApplied = false
+    let startX = 0
+    let startY = 0
+
+    const handleStart = (e) => {
+      if (timer) clearTimeout(timer)
+      touchActionApplied = false
+      const touch = e.touches?.[0]
+      if (touch) {
+        startX = touch.clientX
+        startY = touch.clientY
+      }
+      timer = setTimeout(() => {
+        el.style.touchAction = 'none'
+        touchActionApplied = true
+        timer = null
+      }, 150) // 150ms 延遲判定為長按
+    }
+
+    const handleMove = (e) => {
+      if (!touchActionApplied) {
+        const touch = e.touches?.[0]
+        if (touch) {
+          const deltaX = Math.abs(touch.clientX - startX)
+          const deltaY = Math.abs(touch.clientY - startY)
+          // 若移動距離大於 6px，視為使用者想滾動，取消長按判定並保持可滾動
+          if (deltaX > 6 || deltaY > 6) {
+            if (timer) {
+              clearTimeout(timer)
+              timer = null
+            }
+            el.style.touchAction = ''
+          }
+        }
+      }
+    }
+
+    const handleEnd = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      touchActionApplied = false
+      el.style.touchAction = ''
+    }
+
+    el.addEventListener('touchstart', handleStart, { passive: true })
+    el.addEventListener('touchmove', handleMove, { passive: true })
+    el.addEventListener('touchend', handleEnd, { passive: true })
+    el.addEventListener('touchcancel', handleEnd, { passive: true })
+
+    return () => {
+      el.removeEventListener('touchstart', handleStart)
+      el.removeEventListener('touchmove', handleMove)
+      el.removeEventListener('touchend', handleEnd)
+      el.removeEventListener('touchcancel', handleEnd)
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -115,11 +187,10 @@ function SortableGroup({ id, groupItems, onClick, onMap, onEdit, onDelete, onAdd
     zIndex: isDragging ? 10 : 1,
     opacity: isDragging ? 0.8 : 1,
     position: 'relative',
-    touchAction: 'pan-x',
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="sortable-group">
+    <div ref={handleRef} style={style} {...attributes} {...listeners} className="sortable-group">
       {/* 水平捲動區域 — touch-action: pan-x 讓左右滑動生效，上下拖曳交由 dnd-kit */}
       <div className="horizontal-scroll">
         {groupItems.map((item, idx) => (
@@ -163,7 +234,8 @@ function App() {
   const [deleteItem, setDeleteItem] = useState(null)
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
@@ -192,7 +264,7 @@ function App() {
 
     const oldIndex = groupIds.indexOf(active.id)
     const newIndex = groupIds.indexOf(over.id)
-    
+
     if (oldIndex === -1 || newIndex === -1) return
 
     const newGroupOrder = arrayMove(groupIds, oldIndex, newIndex)
