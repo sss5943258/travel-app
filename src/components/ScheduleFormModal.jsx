@@ -6,7 +6,7 @@ import { API_URL } from '../config'
 
 // mode: 'add', 'edit', 'addBackup'
 // item: 編輯時傳入原卡片，或是新增備案時傳入主卡片
-export default function ScheduleFormModal({ mode, item, day, date, groupId, altOrder, onClose, onSaved }) {
+export default function ScheduleFormModal({ mode, item, day, date, groupId, altOrder, tripId, onClose, onSaved }) {
   const isEdit = mode === 'edit'
 
   const [form, setForm] = useState({
@@ -50,9 +50,20 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
       const targetDate = isEdit || mode === 'addBackup' ? item.date : date;
       const targetDay = isEdit || mode === 'addBackup' ? item.day : day;
 
-      const body = isEdit
+      const isPlaceholder = isEdit && item?.isDefaultPlaceholder;
+
+      const body = (isEdit && !isPlaceholder)
         ? { action: 'updateSchedule', id: item.id, ...form }
-        : { action: 'addSchedule', tripId: 't-3', day: targetDay, date: targetDate, groupId, altOrder, ...form }
+        : {
+            action: 'addSchedule',
+            tripId,
+            id: isEdit ? item.id : undefined,
+            day: targetDay,
+            date: targetDate,
+            groupId: isEdit ? item.groupId : (groupId || undefined),
+            altOrder: isEdit ? item.altOrder : (altOrder || 0),
+            ...form
+          }
 
       await fetch(API_URL, {
         method: 'POST',
@@ -65,8 +76,8 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
         id: isEdit ? item.id : `t3-d${targetDay}-${Date.now()}`,
         day: targetDay,
         date: targetDate,
-        groupId: groupId || undefined,
-        altOrder: altOrder || 0,
+        groupId: isEdit ? item.groupId : (groupId || undefined),
+        altOrder: isEdit ? item.altOrder : (altOrder || 0),
         sortOrder: isEdit ? item.sortOrder : 999
       }
       onSaved(newItem)
@@ -87,9 +98,9 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
         <h2 className="modal-title">
           {mode === 'edit' ? '編輯行程' : mode === 'addBackup' ? '新增彈性備案' : '新增行程'}
         </h2>
-        {isEdit && <p className="modal-subtitle">Day {item.day} · {item.date}</p>}
+        {isEdit && <p className="modal-subtitle">{item.day === 0 ? '旅程資訊' : `Day ${item.day} · ${item.date}`}</p>}
         {mode === 'addBackup' && <p className="modal-subtitle">Day {item.day} · {item.date} (主行程: {item.attractionName})</p>}
-        {mode === 'add' && <p className="modal-subtitle">Day {day} · {date}</p>}
+        {mode === 'add' && <p className="modal-subtitle">{day === 0 ? '旅程資訊' : `Day ${day} · ${date}`}</p>}
 
         <form className="schedule-form" onSubmit={handleSubmit}>
           <div className="form-group">

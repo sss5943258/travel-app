@@ -4,6 +4,7 @@
   --primary: #FFB7C5;
   /* Sakura Pink */
   --primary-dark: #FF9EAE;
+  --text-white: #fcf7f7;
   --text-main: #333333;
   --text-muted: #666666;
   --bg-overlay: rgba(255, 255, 255, 0.4);
@@ -156,8 +157,10 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   position: relative;
-  -webkit-touch-callout: none; /* 防止 iOS 長按跳出選單 */
-  -webkit-user-select: none; /* 防止長按選取文字 */
+  -webkit-touch-callout: none;
+  /* 防止 iOS 長按跳出選單 */
+  -webkit-user-select: none;
+  /* 防止長按選取文字 */
   user-select: none;
 }
 
@@ -173,7 +176,8 @@ body::-webkit-scrollbar {
   /* 左 6% + 右 6% 剛好讓中間 88% 的卡片完美置中 */
   scrollbar-width: none;
   box-sizing: border-box;
-  touch-action: manipulation; /* 允許垂直捲動，同時保留水平滑動 */
+  touch-action: manipulation;
+  /* 允許垂直捲動，同時保留水平滑動 */
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -629,4 +633,168 @@ body::-webkit-scrollbar {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
   }
+}
+
+/* ─── HomePage ─────────────────────────────────────────────── */
+.home-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.home-inner {
+  width: 100%;
+  max-width: 500px;
+}
+
+.home-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem 0;
+}
+
+.home-logo-icon {
+  color: var(--primary-dark);
+  margin-bottom: 0.5rem;
+}
+
+.home-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.3rem;
+}
+
+.home-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.home-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.home-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1rem 1.2rem;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.home-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.home-btn:active {
+  transform: translateY(0);
+}
+
+.home-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.home-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.packing-icon {
+  background: linear-gradient(135deg, #6dd5ed, #2193b0);
+  color: #fff;
+}
+
+.trip-icon {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+}
+
+.home-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.home-btn-label {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-btn-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.home-btn-arrow {
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.home-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #fff;
+  font-size: 1rem;
+  margin-top: 30vh;
+}
+
+.home-error {
+  text-align: center;
+  color: #fff;
+  margin-top: 30vh;
+}
+
+.home-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ─── Back Button (TripPage header) ───────────────────────── */
+.back-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 1.1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }

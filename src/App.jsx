@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2, Share2 } from 'lucide-react'
 import ScheduleFormModal from './components/ScheduleFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
-import { API_URL, TRIP_ID } from './config'
+import HomePage from './components/HomePage'
+import { API_URL } from './config'
 import './index.css'
 
 import {
@@ -30,6 +31,8 @@ function CardMenu({ item, onEdit, onDelete, onAddBackup }) {
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const btnRef = useRef(null)
   const menuRef = useRef(null)
+
+  const isCoreFlight = item.id.startsWith('info-outbound') || item.id.startsWith('info-inbound')
 
   const handleToggle = (e) => {
     e.stopPropagation()
@@ -62,15 +65,19 @@ function CardMenu({ item, onEdit, onDelete, onAddBackup }) {
           className="card-menu-dropdown glass"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
         >
-          <button className="menu-item" onClick={() => { setOpen(false); onAddBackup(item) }}>
-            <Plus size={14} /> 新增備案
-          </button>
+          {!isCoreFlight && (
+            <button className="menu-item" onClick={() => { setOpen(false); onAddBackup(item) }}>
+              <Plus size={14} /> 新增備案
+            </button>
+          )}
           <button className="menu-item" onClick={() => { setOpen(false); onEdit(item) }}>
             <Pencil size={14} /> 編輯
           </button>
-          <button className="menu-item danger" onClick={() => { setOpen(false); onDelete(item) }}>
-            <Trash2 size={14} /> 刪除
-          </button>
+          {!isCoreFlight && (
+            <button className="menu-item danger" onClick={() => { setOpen(false); onDelete(item) }}>
+              <Trash2 size={14} /> 刪除
+            </button>
+          )}
         </div>,
         document.body
       )}
@@ -271,6 +278,33 @@ function AddCard({ onClick }) {
 
 // ─── 主元件 ───────────────────────────────────────────────────────
 function App() {
+  const [currentPage, setCurrentPage] = useState('home') // 'home' | 'trip'
+  const [activeTripId, setActiveTripId] = useState(null)
+
+  const handleSelectTrip = (tripId) => {
+    setActiveTripId(tripId)
+    setCurrentPage('trip')
+  }
+
+  const handleOpenPackingList = () => {
+    // TODO: 攜帶清單頁面
+    alert('攜帶清單功能即將推出！')
+  }
+
+  const handleBackToHome = () => {
+    setCurrentPage('home')
+    setActiveTripId(null)
+  }
+
+  if (currentPage === 'home') {
+    return <HomePage onSelectTrip={handleSelectTrip} onOpenPackingList={handleOpenPackingList} />
+  }
+
+  return <TripPage tripId={activeTripId} onBack={handleBackToHome} />
+}
+
+// ─── 行程頁面（原本的 App 邏輯）───────────────────────────────────
+function TripPage({ tripId, onBack }) {
   const [tripInfo, setTripInfo] = useState(null)
   const [journeys, setJourneys] = useState([])
   const [selectedDay, setSelectedDay] = useState(1)
@@ -337,7 +371,7 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           action: 'updateScheduleOrder',
-          tripId: TRIP_ID,
+          tripId: tripId,
           day: selectedDay,
           orderedIds: newGroupOrder
         })
@@ -351,13 +385,95 @@ function App() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}?action=getTripDetails&tripId=${TRIP_ID}`)
+      const res = await fetch(`${API_URL}?action=getTripDetails&tripId=${tripId}`)
       if (!res.ok) throw new Error('網路請求發生錯誤')
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+
+      let updatedJourneys = data.journeys || []
+      const hasDayZero = updatedJourneys.some(j => j.day === 0)
+      const outboundId = `info-outbound-${tripId}`
+      const inboundId = `info-inbound-${tripId}`
+
+      if (!hasDayZero) {
+        const dayZero = {
+          day: 0,
+          date: '旅程資訊',
+          schedule: [
+            {
+              id: outboundId,
+              groupId: outboundId,
+              day: 0,
+              date: '旅程資訊',
+              startTime: '09:00',
+              endTime: '12:00',
+              attractionName: '去程航班',
+              remark: '請點擊編輯輸入去程航班資訊（航班編號、起飛時間等）',
+              googleMapLink: '',
+              altOrder: 0,
+              sortOrder: 0,
+              isDefaultPlaceholder: true
+            },
+            {
+              id: inboundId,
+              groupId: inboundId,
+              day: 0,
+              date: '旅程資訊',
+              startTime: '15:00',
+              endTime: '18:00',
+              attractionName: '回程航班',
+              remark: '請點擊編輯輸入回程航班資訊（航班編號、起飛時間等）',
+              googleMapLink: '',
+              altOrder: 0,
+              sortOrder: 1,
+              isDefaultPlaceholder: true
+            }
+          ]
+        }
+        updatedJourneys = [dayZero, ...updatedJourneys]
+      } else {
+        const dayZero = updatedJourneys.find(j => j.day === 0)
+        const hasOutbound = dayZero.schedule.some(s => s.id === outboundId)
+        const hasInbound = dayZero.schedule.some(s => s.id === inboundId)
+
+        if (!hasOutbound) {
+          dayZero.schedule.push({
+            id: outboundId,
+            groupId: outboundId,
+            day: 0,
+            date: '旅程資訊',
+            startTime: '09:00',
+            endTime: '12:00',
+            attractionName: '去程航班',
+            remark: '請點擊編輯輸入去程航班資訊（航班編號、起飛時間等）',
+            googleMapLink: '',
+            altOrder: 0,
+            sortOrder: 0,
+            isDefaultPlaceholder: true
+          })
+        }
+        if (!hasInbound) {
+          dayZero.schedule.push({
+            id: inboundId,
+            groupId: inboundId,
+            day: 0,
+            date: '旅程資訊',
+            startTime: '15:00',
+            endTime: '18:00',
+            attractionName: '回程航班',
+            remark: '請點擊編輯輸入回程航班資訊（航班編號、起飛時間等）',
+            googleMapLink: '',
+            altOrder: 0,
+            sortOrder: 1,
+            isDefaultPlaceholder: true
+          })
+        }
+        dayZero.schedule.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+      }
+
       setTripInfo(data)
-      setJourneys(data.journeys || [])
-      if (data.journeys?.length > 0) setSelectedDay(data.journeys[0].day)
+      setJourneys(updatedJourneys)
+      setSelectedDay(0)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -365,7 +481,7 @@ function App() {
     }
   }
 
-  useEffect(() => { fetchTripData() }, [])
+  useEffect(() => { fetchTripData() }, [tripId])
 
   if (isLoading) return <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', height: '100vh' }}><Loader size={32} style={{ marginRight: '10px', animation: 'spin 1s linear infinite' }} /><h2>正在載入行程，請稍候...</h2></div>
   if (error) return <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', height: '100vh', flexDirection: 'column' }}><h2>讀取失敗 🥲</h2><p>{error}</p><p style={{ marginTop: '10px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>請確認你是否已經貼上正確的 API_URL !!</p></div>
@@ -525,6 +641,9 @@ function App() {
     <div className="app-container">
       <header className="header glass">
         <div className="header-top">
+          <button className="back-btn" onClick={onBack} title="回首頁">
+            ←
+          </button>
           <h1 className="title" title={tripInfo?.name || '我的旅遊計畫'}>
             {tripInfo?.name || '我的旅遊計畫'}
           </h1>
@@ -535,37 +654,72 @@ function App() {
           />
         </div>
         <div className="date-selector">
-          {journeys.map((j) => (
-            <button
-              key={j.day}
-              className={`date-tab ${selectedDay === j.day ? 'active' : ''}`}
-              onClick={() => setSelectedDay(j.day)}
-            >
-              Day {j.day}
-              <span className="date-sub">{j.date.slice(5)}</span>
-            </button>
-          ))}
+          {journeys.map((j) => {
+            if (j.day === 0) {
+              return (
+                <button
+                  key={j.day}
+                  className={`date-tab ${selectedDay === j.day ? 'active' : ''}`}
+                  onClick={() => setSelectedDay(j.day)}
+                >
+                  旅程資訊
+                  <span className="date-sub">航班資訊</span>
+                </button>
+              )
+            }
+            return (
+              <button
+                key={j.day}
+                className={`date-tab ${selectedDay === j.day ? 'active' : ''}`}
+                onClick={() => setSelectedDay(j.day)}
+              >
+                Day {j.day}
+                <span className="date-sub">{j.date ? j.date.slice(5) : ''}</span>
+              </button>
+            )
+          })}
         </div>
       </header>
 
       <main className="main-content">
         <div className="schedule-list">
-          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-            <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
-              {scheduleGroups.map((group) => (
-                <SortableGroup
-                  key={group.id}
-                  id={group.id}
-                  groupItems={group.items}
-                  onClick={(item) => setRemarkItem(item)}
-                  onMap={handleMap}
-                  onEdit={(it) => setFormModal({ mode: 'edit', item: it })}
-                  onDelete={(it) => setDeleteItem(it)}
-                  onAddBackup={handleAddBackup}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+          {selectedDay === 0 ? (
+            scheduleGroups.map((group) => (
+              <div key={group.id} className="sortable-group">
+                <div className="horizontal-scroll">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="card-wrapper">
+                      <Card
+                        item={item}
+                        onClick={() => setRemarkItem(item)}
+                        onMap={(e) => handleMap(e, item)}
+                        onEdit={() => setFormModal({ mode: 'edit', item })}
+                        onDelete={() => setDeleteItem(item)}
+                        onAddBackup={handleAddBackup}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+              <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
+                {scheduleGroups.map((group) => (
+                  <SortableGroup
+                    key={group.id}
+                    id={group.id}
+                    groupItems={group.items}
+                    onClick={(item) => setRemarkItem(item)}
+                    onMap={handleMap}
+                    onEdit={(it) => setFormModal({ mode: 'edit', item: it })}
+                    onDelete={(it) => setDeleteItem(it)}
+                    onAddBackup={handleAddBackup}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
 
           {(!scheduleGroups || scheduleGroups.length === 0) && (
             <div className="add-card-container" style={{ textAlign: 'center', opacity: 0.7 }}>
@@ -599,13 +753,14 @@ function App() {
           date={formModal.mode === 'add' ? formModal.date : formModal.item?.date}
           groupId={formModal.groupId}
           altOrder={formModal.altOrder}
+          tripId={tripId}
           onClose={() => setFormModal(null)}
           onSaved={(savedItem) => {
             setJourneys(prev => prev.map(j => {
               if (j.day === savedItem.day) {
                 let newSchedule;
                 if (formModal.mode === 'edit') {
-                  newSchedule = j.schedule.map(si => si.id === savedItem.id ? { ...si, ...savedItem } : si);
+                  newSchedule = j.schedule.map(si => si.id === savedItem.id ? { ...si, ...savedItem, isDefaultPlaceholder: false } : si);
                 } else {
                   newSchedule = [...(j.schedule || []), savedItem];
                 }
