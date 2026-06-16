@@ -50,6 +50,7 @@ function doPost(e) {
     case 'updateSchedule': return createJsonResponse(updateSchedule(payload));
     case 'deleteSchedule': return createJsonResponse(deleteSchedule(payload));
     case 'updateScheduleOrder': return createJsonResponse(updateScheduleOrder(payload));
+    case 'updateTripInfo': return createJsonResponse(updateTripInfo(payload));
 
     default:
       return createJsonResponse({ status: 'error', message: '未知的 action' });

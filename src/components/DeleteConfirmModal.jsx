@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Trash2, Loader } from 'lucide-react'
 import { API_URL } from '../config'
 
-export default function DeleteConfirmModal({ item, onClose, onDeleted }) {
+export default function DeleteConfirmModal({ item, onClose, onDeleted, onConfirm }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -10,12 +11,16 @@ export default function DeleteConfirmModal({ item, onClose, onDeleted }) {
     setIsDeleting(true)
     setError(null)
     try {
-      await fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'deleteSchedule', id: item.id }),
-      })
+      if (onConfirm) {
+        await onConfirm();
+      } else {
+        await fetch(API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'deleteSchedule', id: item.id }),
+        })
+      }
       
       // no-cors 下直接假設成功
       onDeleted()
@@ -25,7 +30,7 @@ export default function DeleteConfirmModal({ item, onClose, onDeleted }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content glass delete-modal" onClick={(e) => e.stopPropagation()}>
         <button className="close-btn" onClick={onClose}>
@@ -54,6 +59,8 @@ export default function DeleteConfirmModal({ item, onClose, onDeleted }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
+

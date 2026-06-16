@@ -1,5 +1,6 @@
 const SHEET_TRIPS = 'Trips';
 const SHEET_SCHEDULES = 'Schedules';
+const SHEET_TRIPS_INFO = 'Trips_Info';
 
 // 👑 記得一定要把這裡換成你正在用的 Google 試算表網址！
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lYFckblUd1aXMOKwM_c-aahlK_gxOQQDqrVwToQ6Bk0/edit';

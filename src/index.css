@@ -449,6 +449,7 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .form-group label {
@@ -463,6 +464,7 @@ body::-webkit-scrollbar {
 
 .form-group input,
 .form-group textarea {
+  width: 100%;
   border: 1.5px solid rgba(0, 0, 0, 0.12);
   border-radius: 10px;
   padding: 0.6rem 0.85rem;
@@ -473,6 +475,7 @@ body::-webkit-scrollbar {
   transition: border-color 0.2s;
   resize: none;
 }
+
 
 .form-group input:focus,
 .form-group textarea:focus {
@@ -485,6 +488,8 @@ body::-webkit-scrollbar {
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
 }
+
+
 
 .form-error {
   font-size: 0.85rem;
@@ -798,3 +803,76 @@ body::-webkit-scrollbar {
 .back-btn:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Custom styling for Trips_Info Day 0 cards and placeholders */
+.card-divider {
+  border: 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+  margin: 0.6rem 0;
+  width: 100%;
+}
+
+.info-card-placeholder {
+  border: 2px dashed rgba(255, 183, 197, 0.5) !important;
+  background: rgba(255, 255, 255, 0.3) !important;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.info-card-placeholder:hover {
+  border-color: var(--primary) !important;
+  background: rgba(255, 183, 197, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 1.5rem 0;
+}
+
+.placeholder-plus-icon {
+  color: var(--primary-dark);
+  opacity: 0.7;
+}
+
+.placeholder-text {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.flight-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.flight-icon {
+  font-size: 1rem;
+}
+
+.flight-time-text {
+  color: var(--text-main);
+}
+
+.airport-tag {
+  font-weight: normal;
+}
+
+.remark-text {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.flight-remark-wrap .remark-text {
+  line-height: 1.5;
+}

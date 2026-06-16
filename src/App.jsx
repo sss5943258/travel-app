@@ -3,9 +3,47 @@ import { createPortal } from 'react-dom'
 import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2, Share2 } from 'lucide-react'
 import ScheduleFormModal from './components/ScheduleFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
+import TripInfoFormModal from './components/TripInfoFormModal'
 import HomePage from './components/HomePage'
 import { API_URL } from './config'
 import './index.css'
+
+// 輔助函式：將過長的文字簡化並加上 ...
+const truncateText = (text, maxLength = 80) => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
+
+// 輔助函式：將任何日期時間字串轉換為 yyyy/MM/dd HH:mm 格式顯示
+const formatDisplayDatetime = (val) => {
+  if (!val) return '未定';
+  
+  const str = String(val).trim();
+  if (!str) return '未定';
+
+  // 1. 如果是標準格式 yyyy-MM-dd HH:mm 或 yyyy-MM-ddTHH:mm（且不帶時區尾綴）
+  const simpleMatch = str.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[T ](\d{2}):(\d{2})/);
+  if (simpleMatch && !str.includes('Z') && !str.includes('+') && !str.includes('GMT')) {
+    return `${simpleMatch[1]}/${simpleMatch[2]}/${simpleMatch[3]} ${simpleMatch[4]}:${simpleMatch[5]}`;
+  }
+
+  // 2. 否則（包含時區或 ISO 序列化字串），將其解析為本地 Date 物件進行格式化
+  const date = new Date(str);
+  if (!isNaN(date.getTime())) {
+    const yyyy = date.getFullYear();
+    const MM = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const HH = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}/${MM}/${dd} ${HH}:${mm}`;
+  }
+
+  // 3. 備用方案
+  return str.replace('T', ' ').replace(/-/g, '/').slice(0, 16);
+};
+
+
 
 import {
   DndContext,
@@ -26,13 +64,15 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // ─── 行程卡片右上角的「...」選單 ───────────────────────────────────
-function CardMenu({ item, onEdit, onDelete, onAddBackup }) {
+function CardMenu({ item, onEdit, onDelete, onAddBackup, showDelete, showAddBackup }) {
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const btnRef = useRef(null)
   const menuRef = useRef(null)
 
-  const isCoreFlight = item.id.startsWith('info-outbound') || item.id.startsWith('info-inbound')
+  const isCoreFlight = item?.id ? (item.id.startsWith('info-outbound') || item.id.startsWith('info-inbound')) : false
+  const actualShowAddBackup = showAddBackup !== undefined ? showAddBackup : !isCoreFlight
+  const actualShowDelete = showDelete !== undefined ? showDelete : !isCoreFlight
 
   const handleToggle = (e) => {
     e.stopPropagation()
@@ -65,15 +105,15 @@ function CardMenu({ item, onEdit, onDelete, onAddBackup }) {
           className="card-menu-dropdown glass"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
         >
-          {!isCoreFlight && (
+          {actualShowAddBackup && (
             <button className="menu-item" onClick={() => { setOpen(false); onAddBackup(item) }}>
               <Plus size={14} /> 新增備案
             </button>
           )}
           <button className="menu-item" onClick={() => { setOpen(false); onEdit(item) }}>
-            <Pencil size={14} /> 編輯
+            <Pencil size={14} /> {item?.isPlaceholder ? '新增' : '編輯'}
           </button>
-          {!isCoreFlight && (
+          {actualShowDelete && (
             <button className="menu-item danger" onClick={() => { setOpen(false); onDelete(item) }}>
               <Trash2 size={14} /> 刪除
             </button>
@@ -306,6 +346,7 @@ function App() {
 // ─── 行程頁面（原本的 App 邏輯）───────────────────────────────────
 function TripPage({ tripId, onBack }) {
   const [tripInfo, setTripInfo] = useState(null)
+  const [tripsInfo, setTripsInfo] = useState(null)
   const [journeys, setJourneys] = useState([])
   const [selectedDay, setSelectedDay] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
@@ -313,7 +354,9 @@ function TripPage({ tripId, onBack }) {
 
   const [remarkItem, setRemarkItem] = useState(null)
   const [formModal, setFormModal] = useState(null)
+  const [tripInfoModal, setTripInfoModal] = useState(null)
   const [deleteItem, setDeleteItem] = useState(null)
+  const [deleteTripInfoType, setDeleteTripInfoType] = useState(null)
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -392,86 +435,16 @@ function TripPage({ tripId, onBack }) {
 
       let updatedJourneys = data.journeys || []
       const hasDayZero = updatedJourneys.some(j => j.day === 0)
-      const outboundId = `info-outbound-${tripId}`
-      const inboundId = `info-inbound-${tripId}`
-
       if (!hasDayZero) {
-        const dayZero = {
-          day: 0,
-          date: '旅程資訊',
-          schedule: [
-            {
-              id: outboundId,
-              groupId: outboundId,
-              day: 0,
-              date: '旅程資訊',
-              startTime: '09:00',
-              endTime: '12:00',
-              attractionName: '去程航班',
-              remark: '請點擊編輯輸入去程航班資訊（航班編號、起飛時間等）',
-              googleMapLink: '',
-              altOrder: 0,
-              sortOrder: 0,
-              isDefaultPlaceholder: true
-            },
-            {
-              id: inboundId,
-              groupId: inboundId,
-              day: 0,
-              date: '旅程資訊',
-              startTime: '15:00',
-              endTime: '18:00',
-              attractionName: '回程航班',
-              remark: '請點擊編輯輸入回程航班資訊（航班編號、起飛時間等）',
-              googleMapLink: '',
-              altOrder: 0,
-              sortOrder: 1,
-              isDefaultPlaceholder: true
-            }
-          ]
-        }
-        updatedJourneys = [dayZero, ...updatedJourneys]
+        updatedJourneys = [{ day: 0, date: '旅程資訊', schedule: [] }, ...updatedJourneys]
       } else {
-        const dayZero = updatedJourneys.find(j => j.day === 0)
-        const hasOutbound = dayZero.schedule.some(s => s.id === outboundId)
-        const hasInbound = dayZero.schedule.some(s => s.id === inboundId)
-
-        if (!hasOutbound) {
-          dayZero.schedule.push({
-            id: outboundId,
-            groupId: outboundId,
-            day: 0,
-            date: '旅程資訊',
-            startTime: '09:00',
-            endTime: '12:00',
-            attractionName: '去程航班',
-            remark: '請點擊編輯輸入去程航班資訊（航班編號、起飛時間等）',
-            googleMapLink: '',
-            altOrder: 0,
-            sortOrder: 0,
-            isDefaultPlaceholder: true
-          })
-        }
-        if (!hasInbound) {
-          dayZero.schedule.push({
-            id: inboundId,
-            groupId: inboundId,
-            day: 0,
-            date: '旅程資訊',
-            startTime: '15:00',
-            endTime: '18:00',
-            attractionName: '回程航班',
-            remark: '請點擊編輯輸入回程航班資訊（航班編號、起飛時間等）',
-            googleMapLink: '',
-            altOrder: 0,
-            sortOrder: 1,
-            isDefaultPlaceholder: true
-          })
-        }
-        dayZero.schedule.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+        // 清除 Day 0 既有的 schedules，避免與新的 Trips_Info 卡片重疊
+        const d0Index = updatedJourneys.findIndex(j => j.day === 0)
+        updatedJourneys[d0Index] = { ...updatedJourneys[d0Index], schedule: [] }
       }
 
       setTripInfo(data)
+      setTripsInfo(data.tripInfo || null)
       setJourneys(updatedJourneys)
       setSelectedDay(0)
     } catch (err) {
@@ -480,6 +453,7 @@ function TripPage({ tripId, onBack }) {
       setIsLoading(false)
     }
   }
+
 
   useEffect(() => { fetchTripData() }, [tripId])
 
@@ -684,24 +658,137 @@ function TripPage({ tripId, onBack }) {
       <main className="main-content">
         <div className="schedule-list">
           {selectedDay === 0 ? (
-            scheduleGroups.map((group) => (
-              <div key={group.id} className="sortable-group">
-                <div className="horizontal-scroll">
-                  {group.items.map((item) => (
-                    <div key={item.id} className="card-wrapper">
-                      <Card
-                        item={item}
-                        onClick={() => setRemarkItem(item)}
-                        onMap={(e) => handleMap(e, item)}
-                        onEdit={() => setFormModal({ mode: 'edit', item })}
-                        onDelete={() => setDeleteItem(item)}
-                        onAddBackup={handleAddBackup}
-                      />
+            <>
+              {/* 去程航班卡片 */}
+              <div className="card-wrapper">
+                {tripsInfo && (tripsInfo.outboundFlightNo || tripsInfo.outboundAirline || tripsInfo.outboundDepartureTime || tripsInfo.outboundArrivalTime || tripsInfo.outboundDepAirport || tripsInfo.outboundArrAirport) ? (
+                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'outbound' })}>
+                    <div className="card-header">
+                      <span className="time">去程航班</span>
+                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                        <CardMenu
+                          showAddBackup={false}
+                          item={{ id: 'info-outbound' }}
+                          onEdit={() => setTripInfoModal({ type: 'outbound' })}
+                          onDelete={() => setDeleteTripInfoType('outbound')}
+                        />
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flight-row" style={{ marginTop: '0.45rem' }}>
+                      <span className="flight-icon">📅</span>
+                      <span className="flight-time-text" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        {tripsInfo.outboundDepartureTime ? formatDisplayDatetime(tripsInfo.outboundDepartureTime) : '起飛未定'} 
+                        {tripsInfo.outboundArrivalTime ? ` - ${formatDisplayDatetime(tripsInfo.outboundArrivalTime)}` : ''}
+                      </span>
+                    </div>
+                    <h3 className="attraction-name flight-detail-text" style={{ margin: '0.45rem 0 0.8rem 0', fontSize: '1.15rem' }}>
+                      {tripsInfo.outboundAirline || ''} {tripsInfo.outboundFlightNo || '未定航班'} 
+                      <span className="airport-tag" style={{ marginLeft: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        ({tripsInfo.outboundDepAirport || '?'} → {tripsInfo.outboundArrAirport || '?'})
+                      </span>
+                    </h3>
+                    <hr className="card-divider" />
+                    <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+                      <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.flightRemark ? truncateText(tripsInfo.flightRemark, 80) : '（無去程班機備註）'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'outbound' })}>
+                    <div className="card-header">
+                      <span className="time">去程航班</span>
+                    </div>
+                    <div className="placeholder-content">
+                      <Plus size={28} className="placeholder-plus-icon" />
+                      <span className="placeholder-text">新增去程航班資訊</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))
+
+              {/* 回程航班卡片 */}
+              <div className="card-wrapper">
+                {tripsInfo && (tripsInfo.inboundFlightNo || tripsInfo.inboundAirline || tripsInfo.inboundDepartureTime || tripsInfo.inboundArrivalTime || tripsInfo.inboundDepAirport || tripsInfo.inboundArrAirport) ? (
+                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'inbound' })}>
+                    <div className="card-header">
+                      <span className="time">回程航班</span>
+                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                        <CardMenu
+                          showAddBackup={false}
+                          item={{ id: 'info-inbound' }}
+                          onEdit={() => setTripInfoModal({ type: 'inbound' })}
+                          onDelete={() => setDeleteTripInfoType('inbound')}
+                        />
+                      </div>
+                    </div>
+                    <div className="flight-row" style={{ marginTop: '0.45rem' }}>
+                      <span className="flight-icon">📅</span>
+                      <span className="flight-time-text" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        {tripsInfo.inboundDepartureTime ? formatDisplayDatetime(tripsInfo.inboundDepartureTime) : '起飛未定'} 
+                        {tripsInfo.inboundArrivalTime ? ` - ${formatDisplayDatetime(tripsInfo.inboundArrivalTime)}` : ''}
+                      </span>
+                    </div>
+
+                    <h3 className="attraction-name flight-detail-text" style={{ margin: '0.45rem 0 0.8rem 0', fontSize: '1.15rem' }}>
+                      {tripsInfo.inboundAirline || ''} {tripsInfo.inboundFlightNo || '未定航班'} 
+                      <span className="airport-tag" style={{ marginLeft: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        ({tripsInfo.inboundDepAirport || '?'} → {tripsInfo.inboundArrAirport || '?'})
+                      </span>
+                    </h3>
+                    <hr className="card-divider" />
+                    <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+                      <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.flightRemark ? truncateText(tripsInfo.flightRemark, 80) : '（無回程班機備註）'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'inbound' })}>
+                    <div className="card-header">
+                      <span className="time">回程航班</span>
+                    </div>
+                    <div className="placeholder-content">
+                      <Plus size={28} className="placeholder-plus-icon" />
+                      <span className="placeholder-text">新增回程航班資訊</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 行程備註卡片 */}
+              <div className="card-wrapper">
+                {tripsInfo && tripsInfo.tripRemark ? (
+                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'remark' })}>
+                    <div className="card-header">
+                      <span className="time">行程備註</span>
+                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                        <CardMenu
+                          showAddBackup={false}
+                          item={{ id: 'info-remark' }}
+                          onEdit={() => setTripInfoModal({ type: 'remark' })}
+                          onDelete={() => setDeleteTripInfoType('remark')}
+                        />
+                      </div>
+                    </div>
+                    <hr className="card-divider" style={{ margin: '0.45rem 0 0.8rem 0' }} />
+                    <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span className="remark-text" style={{ whiteSpace: 'pre-line', fontSize: '0.95rem', color: 'var(--text-main)' }}>{truncateText(tripsInfo.tripRemark, 120)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'remark' })}>
+                    <div className="card-header">
+                      <span className="time">行程備註</span>
+                    </div>
+                    <div className="placeholder-content">
+                      <Plus size={28} className="placeholder-plus-icon" />
+                      <span className="placeholder-text">新增行程備註</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
@@ -721,7 +808,7 @@ function TripPage({ tripId, onBack }) {
             </DndContext>
           )}
 
-          {(!scheduleGroups || scheduleGroups.length === 0) && (
+          {selectedDay !== 0 && (!scheduleGroups || scheduleGroups.length === 0) && (
             <div className="add-card-container" style={{ textAlign: 'center', opacity: 0.7 }}>
               <div className="card glass">
                 <h3 className="attraction-name">這天還沒有安排行程喔！</h3>
@@ -729,9 +816,12 @@ function TripPage({ tripId, onBack }) {
             </div>
           )}
 
-          <div className="add-card-container">
-            <AddCard onClick={() => setFormModal({ mode: 'add', day: currentJourney?.day, date: currentJourney?.date })} />
-          </div>
+          {selectedDay !== 0 && (
+            <div className="add-card-container">
+              <AddCard onClick={() => setFormModal({ mode: 'add', day: currentJourney?.day, date: currentJourney?.date })} />
+            </div>
+          )}
+
         </div>
       </main>
 
@@ -783,8 +873,94 @@ function TripPage({ tripId, onBack }) {
           }}
         />
       )}
+
+      {tripInfoModal && (
+        <TripInfoFormModal
+          type={tripInfoModal.type}
+          tripId={tripId}
+          initialData={tripsInfo}
+          onClose={() => setTripInfoModal(null)}
+          onSaved={(updatedFields) => {
+            setTripsInfo(prev => ({
+              ...prev,
+              ...updatedFields
+            }));
+            setTripInfoModal(null);
+          }}
+        />
+      )}
+
+      {deleteTripInfoType && (
+        <DeleteConfirmModal
+          item={{
+            id: deleteTripInfoType,
+            attractionName: deleteTripInfoType === 'outbound' ? '去程航班資訊' : deleteTripInfoType === 'inbound' ? '回程航班資訊' : '行程備註'
+          }}
+          onClose={() => setDeleteTripInfoType(null)}
+          onDeleted={() => setDeleteTripInfoType(null)}
+          onConfirm={async () => {
+            const dataToClear = {};
+            const hasInbound = tripsInfo && (
+              tripsInfo.inboundFlightNo ||
+              tripsInfo.inboundAirline ||
+              tripsInfo.inboundDepartureTime ||
+              tripsInfo.inboundArrivalTime ||
+              tripsInfo.inboundDepAirport ||
+              tripsInfo.inboundArrAirport
+            );
+            const hasOutbound = tripsInfo && (
+              tripsInfo.outboundFlightNo ||
+              tripsInfo.outboundAirline ||
+              tripsInfo.outboundDepartureTime ||
+              tripsInfo.outboundArrivalTime ||
+              tripsInfo.outboundDepAirport ||
+              tripsInfo.outboundArrAirport
+            );
+
+            if (deleteTripInfoType === 'outbound') {
+              dataToClear.outboundFlightNo = '';
+              dataToClear.outboundAirline = '';
+              dataToClear.outboundDepartureTime = '';
+              dataToClear.outboundArrivalTime = '';
+              dataToClear.outboundDepAirport = '';
+              dataToClear.outboundArrAirport = '';
+              if (!hasInbound) {
+                dataToClear.flightRemark = '';
+              }
+            } else if (deleteTripInfoType === 'inbound') {
+              dataToClear.inboundFlightNo = '';
+              dataToClear.inboundAirline = '';
+              dataToClear.inboundDepartureTime = '';
+              dataToClear.inboundArrivalTime = '';
+              dataToClear.inboundDepAirport = '';
+              dataToClear.inboundArrAirport = '';
+              if (!hasOutbound) {
+                dataToClear.flightRemark = '';
+              }
+            } else if (deleteTripInfoType === 'remark') {
+              dataToClear.tripRemark = '';
+            }
+
+            await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({
+                action: 'updateTripInfo',
+                tripId,
+                data: dataToClear
+              })
+            });
+
+            setTripsInfo(prev => ({
+              ...prev,
+              ...dataToClear
+            }));
+          }}
+        />
+      )}
     </div>
   )
 }
+
 
 export default App
