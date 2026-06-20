@@ -27,7 +27,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
     if (!val) return ''
     const str = String(val).trim();
     if (!str) return '';
-    
+
     // 如果是 ISO/Timezone 格式，將其解析並轉為本地時間格式 YYYY-MM-DDTHH:mm
     const date = new Date(str);
     if (!isNaN(date.getTime())) {
@@ -38,7 +38,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
       const mm = String(date.getMinutes()).padStart(2, '0');
       return `${yyyy}-${MM}-${dd}T${HH}:${mm}`;
     }
-    
+
     // 備用方案
     return str.replace(' ', 'T').slice(0, 16);
   }
@@ -60,7 +60,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
           arrivalTime: toDatetimeLocal(initialData[`${prefix}ArrivalTime`]),
           depAirport: initialData[`${prefix}DepAirport`] || '',
           arrAirport: initialData[`${prefix}ArrAirport`] || '',
-          flightRemark: initialData.flightRemark || '',
+          flightRemark: initialData[`${prefix}FlightRemark`] || '',
           tripRemark: ''
         })
       } else {
@@ -96,7 +96,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
         [`${prefix}ArrivalTime`]: fromDatetimeLocal(form.arrivalTime),
         [`${prefix}DepAirport`]: form.depAirport,
         [`${prefix}ArrAirport`]: form.arrAirport,
-        flightRemark: form.flightRemark
+        [`${prefix}FlightRemark`]: form.flightRemark
       }
     } else {
       updateData = {

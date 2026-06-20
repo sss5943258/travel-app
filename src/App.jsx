@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2, Share2 } from 'lucide-react'
+import { MapPin, X, Info, Loader, MoreHorizontal, Plus, Pencil, Trash2, Share2, Plane, Calendar } from 'lucide-react'
 import ScheduleFormModal from './components/ScheduleFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import TripInfoFormModal from './components/TripInfoFormModal'
@@ -637,7 +637,6 @@ function TripPage({ tripId, onBack }) {
                   onClick={() => setSelectedDay(j.day)}
                 >
                   旅程資訊
-                  <span className="date-sub">航班資訊</span>
                 </button>
               )
             }
@@ -675,22 +674,25 @@ function TripPage({ tripId, onBack }) {
                       </div>
                     </div>
                     <div className="flight-row" style={{ marginTop: '0.45rem' }}>
-                      <span className="flight-icon">📅</span>
+                      <Calendar size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
                       <span className="flight-time-text" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
                         {tripsInfo.outboundDepartureTime ? formatDisplayDatetime(tripsInfo.outboundDepartureTime) : '起飛未定'} 
                         {tripsInfo.outboundArrivalTime ? ` - ${formatDisplayDatetime(tripsInfo.outboundArrivalTime)}` : ''}
                       </span>
                     </div>
-                    <h3 className="attraction-name flight-detail-text" style={{ margin: '0.45rem 0 0.8rem 0', fontSize: '1.15rem' }}>
-                      {tripsInfo.outboundAirline || ''} {tripsInfo.outboundFlightNo || '未定航班'} 
-                      <span className="airport-tag" style={{ marginLeft: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        ({tripsInfo.outboundDepAirport || '?'} → {tripsInfo.outboundArrAirport || '?'})
+                    <div className="flight-row" style={{ marginTop: '0.45rem' }}>
+                      <Plane size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        {tripsInfo.outboundDepAirport || '?'} → {tripsInfo.outboundArrAirport || '?'}
+                        <span style={{ marginLeft: '8px' }}>
+                          {tripsInfo.outboundAirline || ''} {tripsInfo.outboundFlightNo || '未定航班'}
+                        </span>
                       </span>
-                    </h3>
+                    </div>
                     <hr className="card-divider" />
                     <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
                       <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.flightRemark ? truncateText(tripsInfo.flightRemark, 80) : '（無去程班機備註）'}</span>
+                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.outboundFlightRemark ? truncateText(tripsInfo.outboundFlightRemark, 80) : '（無去程班機備註）'}</span>
                     </div>
                   </div>
                 ) : (
@@ -722,23 +724,26 @@ function TripPage({ tripId, onBack }) {
                       </div>
                     </div>
                     <div className="flight-row" style={{ marginTop: '0.45rem' }}>
-                      <span className="flight-icon">📅</span>
+                      <Calendar size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
                       <span className="flight-time-text" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
                         {tripsInfo.inboundDepartureTime ? formatDisplayDatetime(tripsInfo.inboundDepartureTime) : '起飛未定'} 
                         {tripsInfo.inboundArrivalTime ? ` - ${formatDisplayDatetime(tripsInfo.inboundArrivalTime)}` : ''}
                       </span>
                     </div>
 
-                    <h3 className="attraction-name flight-detail-text" style={{ margin: '0.45rem 0 0.8rem 0', fontSize: '1.15rem' }}>
-                      {tripsInfo.inboundAirline || ''} {tripsInfo.inboundFlightNo || '未定航班'} 
-                      <span className="airport-tag" style={{ marginLeft: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        ({tripsInfo.inboundDepAirport || '?'} → {tripsInfo.inboundArrAirport || '?'})
+                    <div className="flight-row" style={{ marginTop: '0.45rem' }}>
+                      <Plane size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        {tripsInfo.inboundDepAirport || '?'} → {tripsInfo.inboundArrAirport || '?'}
+                        <span style={{ marginLeft: '8px' }}>
+                          {tripsInfo.inboundAirline || ''} {tripsInfo.inboundFlightNo || '未定航班'}
+                        </span>
                       </span>
-                    </h3>
+                    </div>
                     <hr className="card-divider" />
                     <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
                       <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.flightRemark ? truncateText(tripsInfo.flightRemark, 80) : '（無回程班機備註）'}</span>
+                      <span className="remark-text" style={{ whiteSpace: 'pre-line' }}>{tripsInfo.inboundFlightRemark ? truncateText(tripsInfo.inboundFlightRemark, 80) : '（無回程班機備註）'}</span>
                     </div>
                   </div>
                 ) : (
@@ -924,9 +929,7 @@ function TripPage({ tripId, onBack }) {
               dataToClear.outboundArrivalTime = '';
               dataToClear.outboundDepAirport = '';
               dataToClear.outboundArrAirport = '';
-              if (!hasInbound) {
-                dataToClear.flightRemark = '';
-              }
+              dataToClear.outboundFlightRemark = '';
             } else if (deleteTripInfoType === 'inbound') {
               dataToClear.inboundFlightNo = '';
               dataToClear.inboundAirline = '';
@@ -934,9 +937,7 @@ function TripPage({ tripId, onBack }) {
               dataToClear.inboundArrivalTime = '';
               dataToClear.inboundDepAirport = '';
               dataToClear.inboundArrAirport = '';
-              if (!hasOutbound) {
-                dataToClear.flightRemark = '';
-              }
+              dataToClear.inboundFlightRemark = '';
             } else if (deleteTripInfoType === 'remark') {
               dataToClear.tripRemark = '';
             }

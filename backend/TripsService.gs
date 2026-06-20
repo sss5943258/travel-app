@@ -40,7 +40,8 @@ function getTripDetails(tripId) {
     inboundArrivalTime: '',
     inboundDepAirport: '',
     inboundArrAirport: '',
-    flightRemark: '',
+    outboundFlightRemark: '',
+    inboundFlightRemark: '',
     tripRemark: ''
   };
 
