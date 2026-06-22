@@ -1,4 +1,4 @@
 export const API_URL =
-  "https://script.google.com/macros/s/AKfycby17NSiI8cqnAwLiuabKCtrCIDJwYHb-TaDsSXbi_2hfpCade_6CNWCzfX6YjbSwzUoXg/exec"
+  "https://script.google.com/macros/s/AKfycbysXPen-XCw73EJOSKwTox_5b-bvnG5UxsjSPmBTCp1Kg9dRU3ljjncOJBMsDUOQ8pjEw/exec"
 
 export const TRIP_ID = "t-3"

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Save, Loader } from 'lucide-react'
+import { X, Loader, ImagePlus, Trash2 } from 'lucide-react'
 import { API_URL } from '../config'
 
 export default function TripInfoFormModal({ type, tripId, initialData, onClose, onSaved }) {
@@ -22,12 +22,19 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
 
+  // 圖片上傳相關 state
+  const [imageFile, setImageFile] = useState(null)         // 新選擇的檔案
+  const [imagePreview, setImagePreview] = useState(null)    // 預覽 URL (base64 or existing URL)
+  const [existingImageUrl, setExistingImageUrl] = useState(null) // 已儲存的圖片 URL
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef(null)
+
   // 輔助函式：將資料庫的 "YYYY-MM-DD HH:mm" 或 timezone 格式字串轉換成 input 需要的 "YYYY-MM-DDTHH:mm"
   const toDatetimeLocal = (val) => {
     if (!val) return ''
     const str = String(val).trim();
     if (!str) return '';
-
+    
     // 如果是 ISO/Timezone 格式，將其解析並轉為本地時間格式 YYYY-MM-DDTHH:mm
     const date = new Date(str);
     if (!isNaN(date.getTime())) {
@@ -38,7 +45,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
       const mm = String(date.getMinutes()).padStart(2, '0');
       return `${yyyy}-${MM}-${dd}T${HH}:${mm}`;
     }
-
+    
     // 備用方案
     return str.replace(' ', 'T').slice(0, 16);
   }
@@ -63,6 +70,12 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
           flightRemark: initialData[`${prefix}FlightRemark`] || '',
           tripRemark: ''
         })
+        // 載入已有的圖片
+        const existingUrl = initialData[`${prefix}ImageUrl`] || ''
+        if (existingUrl) {
+          setExistingImageUrl(existingUrl)
+          setImagePreview(existingUrl)
+        }
       } else {
         setForm({
           flightNo: '',
@@ -80,6 +93,85 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  // 選擇圖片
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 驗證檔案類型
+    if (!file.type.startsWith('image/')) {
+      setError('請選擇圖片檔案')
+      return
+    }
+
+    // 驗證檔案大小 (最大 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('圖片大小不能超過 5MB')
+      return
+    }
+
+    setImageFile(file)
+    setError(null)
+
+    // 產生預覽
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setImagePreview(ev.target.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 移除圖片
+  const handleRemoveImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    setExistingImageUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // 上傳圖片到 Google Drive
+  const uploadImage = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = async (ev) => {
+        try {
+          const base64 = ev.target.result
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              action: 'uploadTripImage',
+              tripId,
+              type: prefix,
+              imageBase64: base64,
+              fileName: `${tripId}_${prefix}_${Date.now()}.${file.name.split('.').pop()}`
+            })
+          })
+
+          const responseText = await res.text()
+          let result = {}
+          try {
+            result = JSON.parse(responseText)
+          } catch (parseErr) {
+            // Fallback
+          }
+
+          if (result.status === 'error') {
+            throw new Error(result.message || '圖片上傳失敗')
+          }
+
+          resolve(result)
+        } catch (err) {
+          reject(err)
+        }
+      }
+      reader.onerror = () => reject(new Error('讀取檔案失敗'))
+      reader.readAsDataURL(file)
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -105,6 +197,20 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
     }
 
     try {
+      // 如果有新圖片要上傳
+      if (imageFile) {
+        setIsUploading(true)
+        const uploadResult = await uploadImage(imageFile)
+        if (uploadResult.imageUrl) {
+          updateData[`${prefix}ImageUrl`] = uploadResult.imageUrl
+        }
+        setIsUploading(false)
+      }
+      // 如果移除了圖片（原本有但現在沒有了）
+      else if (existingImageUrl === null && initialData?.[`${prefix}ImageUrl`]) {
+        updateData[`${prefix}ImageUrl`] = ''
+      }
+
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -131,6 +237,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
       onSaved(updateData)
     } catch (err) {
       setError(err.message)
+      setIsUploading(false)
     } finally {
       setIsSaving(false)
     }
@@ -140,116 +247,168 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content glass form-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close-btn" onClick={onClose}>
-          <X size={20} />
-        </button>
-
-        <h2 className="modal-title">
-          {type === 'outbound' ? '編輯去程航班' : type === 'inbound' ? '編輯回程航班' : '編輯行程備註'}
-        </h2>
-        <p className="modal-subtitle">旅程資訊</p>
-
-        <form className="schedule-form" onSubmit={handleSubmit}>
-          {isFlight ? (
-            <>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>航班編號</label>
-                  <input
-                    name="flightNo"
-                    value={form.flightNo}
-                    onChange={handleChange}
-                    placeholder="例如：MM722"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>航空公司</label>
-                  <input
-                    name="airline"
-                    value={form.airline}
-                    onChange={handleChange}
-                    placeholder="例如：樂桃航空"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>起飛時間</label>
-                <input
-                  type="datetime-local"
-                  name="departureTime"
-                  value={form.departureTime}
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="form-group">
-                <label>抵達時間</label>
-                <input
-                  type="datetime-local"
-                  name="arrivalTime"
-                  value={form.arrivalTime}
-                  onChange={handleChange}
-                />
-              </div>
-
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>起飛機場 / 地點</label>
-                  <input
-                    name="depAirport"
-                    value={form.depAirport}
-                    onChange={handleChange}
-                    placeholder="例如：TPE (桃園)"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>抵達機場 / 地點</label>
-                  <input
-                    name="arrAirport"
-                    value={form.arrAirport}
-                    onChange={handleChange}
-                    placeholder="例如：NGO (名古屋)"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>班機備註</label>
-                <textarea
-                  name="flightRemark"
-                  value={form.flightRemark}
-                  onChange={handleChange}
-                  placeholder="航班注意事項、行李重量限制等..."
-                  rows={2}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="form-group">
-              <label>行程備註</label>
-              <textarea
-                name="tripRemark"
-                value={form.tripRemark}
-                onChange={handleChange}
-                placeholder="在此填寫行前準備、行程備忘等資訊..."
-                rows={6}
-              />
-            </div>
-          )}
-
-          {error && <p className="form-error">{error}</p>}
-
-          <div className="form-actions">
-            <button type="button" className="btn-cancel" onClick={onClose} disabled={isSaving}>
-              取消
-            </button>
-            <button type="submit" className="btn-save" disabled={isSaving}>
-              {isSaving ? <Loader size={16} className="spin-icon" /> : <Save size={16} />}
-              {isSaving ? '儲存中...' : '儲存'}
-            </button>
+        {/* Fixed Header */}
+        <div className="form-modal-header">
+          <div>
+            <h2 className="modal-title">
+              {type === 'outbound' ? '編輯去程航班' : type === 'inbound' ? '編輯回程航班' : '編輯行程備註'}
+            </h2>
+            <p className="modal-subtitle">旅程資訊</p>
           </div>
-        </form>
+          <button className="close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="form-modal-body">
+          <form className="schedule-form" id="tripInfoForm" onSubmit={handleSubmit}>
+            {isFlight ? (
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>航班編號</label>
+                    <input
+                      name="flightNo"
+                      value={form.flightNo}
+                      onChange={handleChange}
+                      placeholder="例如：MM722"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>航空公司</label>
+                    <input
+                      name="airline"
+                      value={form.airline}
+                      onChange={handleChange}
+                      placeholder="例如：樂桃航空"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>起飛時間</label>
+                  <input
+                    type="datetime-local"
+                    name="departureTime"
+                    value={form.departureTime}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>抵達時間</label>
+                  <input
+                    type="datetime-local"
+                    name="arrivalTime"
+                    value={form.arrivalTime}
+                    onChange={handleChange}
+                  />
+                </div>
+
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>起飛機場 / 地點</label>
+                    <input
+                      name="depAirport"
+                      value={form.depAirport}
+                      onChange={handleChange}
+                      placeholder="例如：TPE (桃園)"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>抵達機場 / 地點</label>
+                    <input
+                      name="arrAirport"
+                      value={form.arrAirport}
+                      onChange={handleChange}
+                      placeholder="例如：NGO (名古屋)"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>班機備註</label>
+                  <textarea
+                    name="flightRemark"
+                    value={form.flightRemark}
+                    onChange={handleChange}
+                    placeholder="航班注意事項、行李重量限制等..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* 圖片上傳區塊 */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: 'none' }}
+                />
+
+                {imagePreview ? (
+                  <div className="image-preview-container">
+                    <img
+                      src={imagePreview}
+                      alt="航班圖片預覽"
+                      className="image-preview"
+                    />
+                    <div className="image-preview-actions">
+                      <button
+                        type="button"
+                        className="image-action-btn change"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImagePlus size={14} />
+                        更換圖片
+                      </button>
+                      <button
+                        type="button"
+                        className="image-action-btn remove"
+                        onClick={handleRemoveImage}
+                      >
+                        <Trash2 size={14} />
+                        移除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="image-upload-area"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImagePlus size={32} className="upload-icon" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="form-group">
+                <label>行程備註</label>
+                <textarea
+                  name="tripRemark"
+                  value={form.tripRemark}
+                  onChange={handleChange}
+                  placeholder="在此填寫行前準備、行程備忘等資訊..."
+                  rows={6}
+                />
+              </div>
+            )}
+
+            {error && <p className="form-error">{error}</p>}
+          </form>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="form-modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose} disabled={isSaving}>
+            取消
+          </button>
+          <button type="submit" form="tripInfoForm" className="btn-save" disabled={isSaving}>
+            {isSaving && <Loader size={16} className="spin-icon" />}
+            {isUploading ? '上傳圖片中...' : isSaving ? '儲存中...' : '儲存'}
+          </button>
+        </div>
       </div>
     </div>,
     document.body

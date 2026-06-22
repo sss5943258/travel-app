@@ -42,6 +42,8 @@ function getTripDetails(tripId) {
     inboundArrAirport: '',
     outboundFlightRemark: '',
     inboundFlightRemark: '',
+    outboundImageUrl: '',
+    inboundImageUrl: '',
     tripRemark: ''
   };
 
@@ -121,3 +123,60 @@ function updateTripInfo(payload) {
   return { status: 'success', message: '更新旅程資訊成功' };
 }
 
+/**
+ * 上傳圖片到 Google Drive，並將圖片 URL 寫入 Trips_Info
+ * @param {Object} payload - { tripId, type ('outbound'|'inbound'), imageBase64, fileName }
+ */
+function uploadTripImage(payload) {
+  const { tripId, type, imageBase64, fileName } = payload;
+
+  if (!tripId || !type || !imageBase64) {
+    return { status: 'error', message: '缺少必要參數 (tripId, type, imageBase64)' };
+  }
+
+  if (type !== 'outbound' && type !== 'inbound') {
+    return { status: 'error', message: 'type 必須是 outbound 或 inbound' };
+  }
+
+  try {
+    // 1. 解碼 Base64 → Blob
+    // imageBase64 格式: "data:image/png;base64,iVBORw0KGgo..."
+    const parts = imageBase64.split(',');
+    const mimeMatch = parts[0].match(/data:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    const base64Data = parts.length > 1 ? parts[1] : parts[0];
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName || 'trip_image.png');
+
+    // 2. 存到 Google Drive 指定資料夾
+    const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    const file = folder.createFile(blob);
+
+    // 3. 設定為任何人可透過連結查看
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    // 4. 產生可直接顯示的圖片 URL
+    const fileId = file.getId();
+    const imageUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
+
+    // 5. 將 URL 寫入 Trips_Info
+    const fieldName = type === 'outbound' ? 'outboundImageUrl' : 'inboundImageUrl';
+    const updateResult = updateTripInfo({
+      tripId: tripId,
+      data: { [fieldName]: imageUrl }
+    });
+
+    if (updateResult.status === 'error') {
+      return updateResult;
+    }
+
+    return {
+      status: 'success',
+      message: '圖片上傳成功',
+      imageUrl: imageUrl,
+      fieldName: fieldName
+    };
+  } catch (err) {
+    Logger.log('圖片上傳失敗: ' + err.message);
+    return { status: 'error', message: '圖片上傳失敗: ' + err.message };
+  }
+}
