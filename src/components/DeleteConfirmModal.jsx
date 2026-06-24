@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Trash2, Loader } from 'lucide-react'
 import { API_URL } from '../config'
+import { cachedFetch } from '../utils/api'
 
 export default function DeleteConfirmModal({ item, onClose, onDeleted, onConfirm }) {
   const [isDeleting, setIsDeleting] = useState(false)
@@ -14,7 +15,7 @@ export default function DeleteConfirmModal({ item, onClose, onDeleted, onConfirm
       if (onConfirm) {
         await onConfirm();
       } else {
-        await fetch(API_URL, {
+        await cachedFetch(API_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },

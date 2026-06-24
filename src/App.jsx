@@ -6,6 +6,7 @@ import DeleteConfirmModal from './components/DeleteConfirmModal'
 import TripInfoFormModal from './components/TripInfoFormModal'
 import HomePage from './components/HomePage'
 import { API_URL } from './config'
+import { cachedFetch } from './utils/api'
 import './index.css'
 
 // 輔助函式：將過長的文字簡化並加上 ...
@@ -409,7 +410,7 @@ function TripPage({ tripId, onBack }) {
     })
 
     try {
-      await fetch(`${API_URL}`, {
+      await cachedFetch(`${API_URL}`, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
@@ -428,7 +429,7 @@ function TripPage({ tripId, onBack }) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}?action=getTripDetails&tripId=${tripId}`)
+      const res = await cachedFetch(`${API_URL}?action=getTripDetails&tripId=${tripId}`)
       if (!res.ok) throw new Error('網路請求發生錯誤')
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -457,8 +458,9 @@ function TripPage({ tripId, onBack }) {
 
   useEffect(() => { fetchTripData() }, [tripId])
 
-  if (isLoading) return <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', height: '100vh' }}><Loader size={32} style={{ marginRight: '10px', animation: 'spin 1s linear infinite' }} /><h2>正在載入行程，請稍候...</h2></div>
+  if (isLoading) return <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', height: '100vh', flexDirection: 'column', gap: '12px' }}><Loader size={32} style={{ animation: 'spin 1s linear infinite' }} /><h2>正在載入行程，請稍候...</h2><p style={{ fontSize: '13px', opacity: 0.7 }}>若載入時間過長，可能正在等待 API 回應，請耐心等候。</p></div>
   if (error) return <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', height: '100vh', flexDirection: 'column' }}><h2>讀取失敗 🥲</h2><p>{error}</p><p style={{ marginTop: '10px', color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>請確認你是否已經貼上正確的 API_URL !!</p></div>
+
 
   const currentJourney = journeys.find((j) => j.day === selectedDay) || journeys[0]
 
@@ -942,7 +944,7 @@ function TripPage({ tripId, onBack }) {
               dataToClear.tripRemark = '';
             }
 
-            await fetch(API_URL, {
+            await cachedFetch(API_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Loader, Plane, CheckSquare, ChevronRight } from 'lucide-react'
 import { API_URL } from '../config'
+import { cachedFetch } from '../utils/api'
 
 function HomePage({ onSelectTrip, onOpenPackingList }) {
   const [trips, setTrips] = useState([])
@@ -11,7 +12,7 @@ function HomePage({ onSelectTrip, onOpenPackingList }) {
     const fetchTrips = async () => {
       setIsLoading(true)
       try {
-        const res = await fetch(`${API_URL}?action=getTrips`)
+        const res = await cachedFetch(`${API_URL}?action=getTrips`)
         if (!res.ok) throw new Error('網路請求發生錯誤')
         const data = await res.json()
         if (data.error) throw new Error(data.error)

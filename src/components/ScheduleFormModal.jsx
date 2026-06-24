@@ -4,6 +4,7 @@ import { X, Save, Loader } from 'lucide-react'
 import { TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import { API_URL } from '../config'
+import { cachedFetch } from '../utils/api'
 
 // mode: 'add', 'edit', 'addBackup'
 // item: 編輯時傳入原卡片，或是新增備案時傳入主卡片
@@ -66,7 +67,7 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
             ...form
           }
 
-      await fetch(API_URL, {
+      await cachedFetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(body),
