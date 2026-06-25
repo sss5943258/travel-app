@@ -22,6 +22,26 @@ function doGet(e) {
 }
 
 // ============================================
+// 【輔助】驗證傳入 ID 是可編輯的 tripId（非 readOnlyId）
+// ============================================
+function isValidEditTripId(tripId) {
+  if (!tripId) return false;
+  const sheet = getMySpreadsheet().getSheetByName(SHEET_TRIPS);
+  const data = parseSheetData(sheet.getDataRange().getValues());
+  return data.some(t => String(t.tripId) === String(tripId));
+}
+
+// 以 scheduleId 反查所屬 tripId，再驗證是否為可編輯 ID
+function isValidEditByScheduleId(scheduleId) {
+  if (!scheduleId) return false;
+  const sheet = getMySpreadsheet().getSheetByName(SHEET_SCHEDULES);
+  const data = parseSheetData(sheet.getDataRange().getValues());
+  const item = data.find(s => String(s.id) === String(scheduleId));
+  if (!item) return false;
+  return isValidEditTripId(item.tripId);
+}
+
+// ============================================
 // 【2】 處理前端新增 (POST)
 // ============================================
 function doPost(e) {
@@ -40,18 +60,33 @@ function doPost(e) {
       return createJsonResponse({ status: 'success', message: '建立旅遊計畫成功' });
     }
     case 'createSchedule': {
+      if (!isValidEditTripId(payload.data && payload.data.tripId)) {
+        return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      }
       const sheet = getMySpreadsheet().getSheetByName(SHEET_SCHEDULES);
       appendDataToSheet(sheet, payload.data);
       return createJsonResponse({ status: 'success', message: '新增行程項目成功' });
     }
 
     // 新增 CRUD
-    case 'addSchedule':    return createJsonResponse(addSchedule(payload));
-    case 'updateSchedule': return createJsonResponse(updateSchedule(payload));
-    case 'deleteSchedule': return createJsonResponse(deleteSchedule(payload));
-    case 'updateScheduleOrder': return createJsonResponse(updateScheduleOrder(payload));
-    case 'updateTripInfo': return createJsonResponse(updateTripInfo(payload));
-    case 'uploadTripImage': return createJsonResponse(uploadTripImage(payload));
+    case 'addSchedule':
+      if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(addSchedule(payload));
+    case 'updateSchedule':
+      if (!isValidEditByScheduleId(payload.id)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(updateSchedule(payload));
+    case 'deleteSchedule':
+      if (!isValidEditByScheduleId(payload.id)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(deleteSchedule(payload));
+    case 'updateScheduleOrder':
+      if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(updateScheduleOrder(payload));
+    case 'updateTripInfo':
+      if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(updateTripInfo(payload));
+    case 'uploadTripImage':
+      if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(uploadTripImage(payload));
 
     default:
       return createJsonResponse({ status: 'error', message: '未知的 action' });

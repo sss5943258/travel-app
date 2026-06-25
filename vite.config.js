@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/travel-app/', // 請確保這與你在 Github 的 Repository 名稱一致
+  base: '/travel-app', // 請確保這與你在 Github 的 Repository 名稱一致
   plugins: [
     react(),
     VitePWA({ 

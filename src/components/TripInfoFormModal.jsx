@@ -37,7 +37,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
     if (!val) return ''
     const str = String(val).trim();
     if (!str) return '';
-    
+
     // 如果是 ISO/Timezone 格式，將其解析並轉為本地時間格式 YYYY-MM-DDTHH:mm
     const date = new Date(str);
     if (!isNaN(date.getTime())) {
@@ -48,7 +48,7 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
       const mm = String(date.getMinutes()).padStart(2, '0');
       return `${yyyy}-${MM}-${dd}T${HH}:${mm}`;
     }
-    
+
     // 備用方案
     return str.replace(' ', 'T').slice(0, 16);
   }
@@ -291,23 +291,25 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
                       </div>
                     </div>
 
-                    <div className="form-group">
-                      <label>起飛時間</label>
-                      <input
-                        type="datetime-local"
-                        name="departureTime"
-                        value={form.departureTime}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>抵達時間</label>
-                      <input
-                        type="datetime-local"
-                        name="arrivalTime"
-                        value={form.arrivalTime}
-                        onChange={handleChange}
-                      />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>起飛時間</label>
+                        <input
+                          type="datetime-local"
+                          name="departureTime"
+                          value={form.departureTime}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>抵達時間</label>
+                        <input
+                          type="datetime-local"
+                          name="arrivalTime"
+                          value={form.arrivalTime}
+                          onChange={handleChange}
+                        />
+                      </div>
                     </div>
 
                     <div className="form-row">

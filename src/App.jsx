@@ -175,7 +175,7 @@ function ShareMenu({ onShareLink, onShareText, onShareCSV }) {
 }
 
 // ─── 單張行程卡片 (不會被 dnd-kit 包裝，由外層負責拖曳) ──────────────────────────
-function Card({ item, onClick, onMap, onEdit, onDelete, onAddBackup }) {
+function Card({ item, onClick, onMap, onEdit, onDelete, onAddBackup, isReadOnly }) {
   return (
     <div className="card glass clickable" onClick={onClick}>
       <div className="card-header">
@@ -190,7 +190,7 @@ function Card({ item, onClick, onMap, onEdit, onDelete, onAddBackup }) {
           >
             <MapPin size={18} />
           </button>
-          <CardMenu item={item} onEdit={onEdit} onDelete={onDelete} onAddBackup={onAddBackup} />
+          {!isReadOnly && <CardMenu item={item} onEdit={onEdit} onDelete={onDelete} onAddBackup={onAddBackup} />}
         </div>
       </div>
       <h3 className="attraction-name">{item.attractionName}</h3>
@@ -319,12 +319,23 @@ function AddCard({ onClick }) {
 
 // ─── 主元件 ───────────────────────────────────────────────────────
 function App() {
-  const [currentPage, setCurrentPage] = useState('home') // 'home' | 'trip'
-  const [activeTripId, setActiveTripId] = useState(null)
+  // Derive initial state directly from the current URL on first render.
+  const getIdFromUrl = () => new URLSearchParams(window.location.search).get('id')
+
+  const [activeTripId, setActiveTripId] = useState(getIdFromUrl)
+
+  // Listen for browser back / forward navigation.
+  useEffect(() => {
+    const handlePop = () => setActiveTripId(getIdFromUrl())
+    window.addEventListener('popstate', handlePop)
+    return () => window.removeEventListener('popstate', handlePop)
+  }, [])
 
   const handleSelectTrip = (tripId) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('id', tripId)
+    window.history.pushState({ tripId }, '', url)
     setActiveTripId(tripId)
-    setCurrentPage('trip')
   }
 
   const handleOpenPackingList = () => {
@@ -333,16 +344,21 @@ function App() {
   }
 
   const handleBackToHome = () => {
-    setCurrentPage('home')
+    const url = new URL(window.location.href)
+    url.searchParams.delete('id')
+    window.history.pushState({}, '', url)
     setActiveTripId(null)
   }
 
-  if (currentPage === 'home') {
+  if (!activeTripId) {
     return <HomePage onSelectTrip={handleSelectTrip} onOpenPackingList={handleOpenPackingList} />
   }
 
   return <TripPage tripId={activeTripId} onBack={handleBackToHome} />
 }
+
+
+
 
 // ─── 行程頁面（原本的 App 邏輯）───────────────────────────────────
 function TripPage({ tripId, onBack }) {
@@ -352,6 +368,7 @@ function TripPage({ tripId, onBack }) {
   const [selectedDay, setSelectedDay] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isReadOnly, setIsReadOnly] = useState(false)
 
   const [remarkItem, setRemarkItem] = useState(null)
   const [formModal, setFormModal] = useState(null)
@@ -445,6 +462,7 @@ function TripPage({ tripId, onBack }) {
       }
 
       setTripInfo(data)
+      setIsReadOnly(data.isReadOnly || false)
       setTripsInfo(data.tripInfo || null)
       setJourneys(updatedJourneys)
       setSelectedDay(0)
@@ -506,14 +524,21 @@ function TripPage({ tripId, onBack }) {
   }
 
   const handleShareLink = () => {
+    const readOnlyId = tripInfo?.readOnlyId
+    const shareUrl = new URL(window.location.href)
+    if (readOnlyId) {
+      shareUrl.searchParams.set('id', readOnlyId)
+    }
+    const shareUrlStr = shareUrl.toString()
+
     if (navigator.share) {
       navigator.share({
         title: tripInfo?.name || '我的旅遊計畫',
-        url: window.location.href
+        url: shareUrlStr
       }).catch(err => console.log('Share canceled or failed:', err))
     } else {
-      navigator.clipboard.writeText(window.location.href)
-        .then(() => alert('已複製行程連結到剪貼簿！'))
+      navigator.clipboard.writeText(shareUrlStr)
+        .then(() => alert(readOnlyId ? '已複製唯讀分享連結到剪貼簿！' : '已複製行程連結到剪貼簿！'))
         .catch(() => alert('複製連結失敗，請手動複製網址。'))
     }
   }
@@ -663,17 +688,19 @@ function TripPage({ tripId, onBack }) {
               {/* 去程航班卡片 */}
               <div className="card-wrapper">
                 {tripsInfo && (tripsInfo.outboundFlightNo || tripsInfo.outboundAirline || tripsInfo.outboundDepartureTime || tripsInfo.outboundArrivalTime || tripsInfo.outboundDepAirport || tripsInfo.outboundArrAirport) ? (
-                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'outbound' })}>
+                  <div className={`card glass ${!isReadOnly ? 'clickable' : ''}`} onClick={!isReadOnly ? () => setTripInfoModal({ type: 'outbound' }) : undefined}>
                     <div className="card-header">
                       <span className="time">去程航班</span>
-                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                        <CardMenu
-                          showAddBackup={false}
-                          item={{ id: 'info-outbound' }}
-                          onEdit={() => setTripInfoModal({ type: 'outbound' })}
-                          onDelete={() => setDeleteTripInfoType('outbound')}
-                        />
-                      </div>
+                      {!isReadOnly && (
+                        <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                          <CardMenu
+                            showAddBackup={false}
+                            item={{ id: 'info-outbound' }}
+                            onEdit={() => setTripInfoModal({ type: 'outbound' })}
+                            onDelete={() => setDeleteTripInfoType('outbound')}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="flight-row" style={{ marginTop: '0.45rem' }}>
                       <Calendar size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
@@ -698,32 +725,45 @@ function TripPage({ tripId, onBack }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'outbound' })}>
-                    <div className="card-header">
-                      <span className="time">去程航班</span>
+                  isReadOnly ? (
+                    <div className="card glass">
+                      <div className="card-header">
+                        <span className="time">去程航班</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <span className="placeholder-text" style={{ opacity: 0.55 }}>尚無去程航班資訊</span>
+                      </div>
                     </div>
-                    <div className="placeholder-content">
-                      <Plus size={28} className="placeholder-plus-icon" />
-                      <span className="placeholder-text">新增去程航班資訊</span>
+                  ) : (
+                    <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'outbound' })}>
+                      <div className="card-header">
+                        <span className="time">去程航班</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <Plus size={28} className="placeholder-plus-icon" />
+                        <span className="placeholder-text">新增去程航班資訊</span>
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
 
               {/* 回程航班卡片 */}
               <div className="card-wrapper">
                 {tripsInfo && (tripsInfo.inboundFlightNo || tripsInfo.inboundAirline || tripsInfo.inboundDepartureTime || tripsInfo.inboundArrivalTime || tripsInfo.inboundDepAirport || tripsInfo.inboundArrAirport) ? (
-                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'inbound' })}>
+                  <div className={`card glass ${!isReadOnly ? 'clickable' : ''}`} onClick={!isReadOnly ? () => setTripInfoModal({ type: 'inbound' }) : undefined}>
                     <div className="card-header">
                       <span className="time">回程航班</span>
-                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                        <CardMenu
-                          showAddBackup={false}
-                          item={{ id: 'info-inbound' }}
-                          onEdit={() => setTripInfoModal({ type: 'inbound' })}
-                          onDelete={() => setDeleteTripInfoType('inbound')}
-                        />
-                      </div>
+                      {!isReadOnly && (
+                        <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                          <CardMenu
+                            showAddBackup={false}
+                            item={{ id: 'info-inbound' }}
+                            onEdit={() => setTripInfoModal({ type: 'inbound' })}
+                            onDelete={() => setDeleteTripInfoType('inbound')}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="flight-row" style={{ marginTop: '0.45rem' }}>
                       <Calendar size={16} style={{ flexShrink: 0, width: 16, height: 16 }} />
@@ -749,32 +789,45 @@ function TripPage({ tripId, onBack }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'inbound' })}>
-                    <div className="card-header">
-                      <span className="time">回程航班</span>
+                  isReadOnly ? (
+                    <div className="card glass">
+                      <div className="card-header">
+                        <span className="time">回程航班</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <span className="placeholder-text" style={{ opacity: 0.55 }}>尚無回程航班資訊</span>
+                      </div>
                     </div>
-                    <div className="placeholder-content">
-                      <Plus size={28} className="placeholder-plus-icon" />
-                      <span className="placeholder-text">新增回程航班資訊</span>
+                  ) : (
+                    <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'inbound' })}>
+                      <div className="card-header">
+                        <span className="time">回程航班</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <Plus size={28} className="placeholder-plus-icon" />
+                        <span className="placeholder-text">新增回程航班資訊</span>
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
 
               {/* 行程備註卡片 */}
               <div className="card-wrapper">
                 {tripsInfo && tripsInfo.tripRemark ? (
-                  <div className="card glass clickable" onClick={() => setTripInfoModal({ type: 'remark' })}>
+                  <div className={`card glass ${!isReadOnly ? 'clickable' : ''}`} onClick={!isReadOnly ? () => setTripInfoModal({ type: 'remark' }) : undefined}>
                     <div className="card-header">
                       <span className="time">行程備註</span>
-                      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                        <CardMenu
-                          showAddBackup={false}
-                          item={{ id: 'info-remark' }}
-                          onEdit={() => setTripInfoModal({ type: 'remark' })}
-                          onDelete={() => setDeleteTripInfoType('remark')}
-                        />
-                      </div>
+                      {!isReadOnly && (
+                        <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                          <CardMenu
+                            showAddBackup={false}
+                            item={{ id: 'info-remark' }}
+                            onEdit={() => setTripInfoModal({ type: 'remark' })}
+                            onDelete={() => setDeleteTripInfoType('remark')}
+                          />
+                        </div>
+                      )}
                     </div>
                     <hr className="card-divider" style={{ margin: '0.45rem 0 0.8rem 0' }} />
                     <div className="flight-remark-wrap" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -783,36 +836,67 @@ function TripPage({ tripId, onBack }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'remark' })}>
-                    <div className="card-header">
-                      <span className="time">行程備註</span>
+                  isReadOnly ? (
+                    <div className="card glass">
+                      <div className="card-header">
+                        <span className="time">行程備註</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <span className="placeholder-text" style={{ opacity: 0.55 }}>尚無行程備註</span>
+                      </div>
                     </div>
-                    <div className="placeholder-content">
-                      <Plus size={28} className="placeholder-plus-icon" />
-                      <span className="placeholder-text">新增行程備註</span>
+                  ) : (
+                    <div className="card glass info-card-placeholder clickable" onClick={() => setTripInfoModal({ type: 'remark' })}>
+                      <div className="card-header">
+                        <span className="time">行程備註</span>
+                      </div>
+                      <div className="placeholder-content">
+                        <Plus size={28} className="placeholder-plus-icon" />
+                        <span className="placeholder-text">新增行程備註</span>
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
 
             </>
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-              <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
-                {scheduleGroups.map((group) => (
-                  <SortableGroup
-                    key={group.id}
-                    id={group.id}
-                    groupItems={group.items}
-                    onClick={(item) => setRemarkItem(item)}
-                    onMap={handleMap}
-                    onEdit={(it) => setFormModal({ mode: 'edit', item: it })}
-                    onDelete={(it) => setDeleteItem(it)}
-                    onAddBackup={handleAddBackup}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
+            isReadOnly ? (
+              scheduleGroups.map((group) => (
+                <div key={group.id} className="sortable-group">
+                  <div className="horizontal-scroll">
+                    {group.items.map((item, idx) => (
+                      <div key={item.id} className="card-wrapper">
+                        <Card
+                          item={item}
+                          altCount={idx === 0 ? group.items.length - 1 : 0}
+                          onClick={() => setRemarkItem(item)}
+                          onMap={(e) => handleMap(e, item)}
+                          isReadOnly={true}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                <SortableContext items={scheduleGroups.map(g => g.id)} strategy={verticalListSortingStrategy}>
+                  {scheduleGroups.map((group) => (
+                    <SortableGroup
+                      key={group.id}
+                      id={group.id}
+                      groupItems={group.items}
+                      onClick={(item) => setRemarkItem(item)}
+                      onMap={handleMap}
+                      onEdit={(it) => setFormModal({ mode: 'edit', item: it })}
+                      onDelete={(it) => setDeleteItem(it)}
+                      onAddBackup={handleAddBackup}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            )
           )}
 
           {selectedDay !== 0 && (!scheduleGroups || scheduleGroups.length === 0) && (
@@ -823,7 +907,7 @@ function TripPage({ tripId, onBack }) {
             </div>
           )}
 
-          {selectedDay !== 0 && (
+          {selectedDay !== 0 && !isReadOnly && (
             <div className="add-card-container">
               <AddCard onClick={() => setFormModal({ mode: 'add', day: currentJourney?.day, date: currentJourney?.date })} />
             </div>

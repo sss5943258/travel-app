@@ -93,91 +93,99 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content glass form-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close-btn" onClick={onClose}>
-          <X size={20} />
-        </button>
-
-        <h2 className="modal-title">
-          {mode === 'edit' ? '編輯行程' : mode === 'addBackup' ? '新增彈性備案' : '新增行程'}
-        </h2>
-        {isEdit && <p className="modal-subtitle">{item.day === 0 ? '旅程資訊' : `Day ${item.day} · ${item.date}`}</p>}
-        {mode === 'addBackup' && <p className="modal-subtitle">Day {item.day} · {item.date} (主行程: {item.attractionName})</p>}
-        {mode === 'add' && <p className="modal-subtitle">{day === 0 ? '旅程資訊' : `Day ${day} · ${date}`}</p>}
-
-        <form className="schedule-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>行程名稱 <span className="required">*</span></label>
-            <input
-              name="attractionName"
-              value={form.attractionName}
-              onChange={handleChange}
-              placeholder="例：清水寺 (景點)"
-              required
-            />
+        {/* Fixed Header */}
+        <div className="form-modal-header">
+          <div>
+            <h2 className="modal-title">
+              {mode === 'edit' ? '編輯行程' : mode === 'addBackup' ? '新增彈性備案' : '新增行程'}
+            </h2>
+            {isEdit && <p className="modal-subtitle">{item.day === 0 ? '旅程資訊' : `Day ${item.day} · ${item.date}`}</p>}
+            {mode === 'addBackup' && <p className="modal-subtitle">Day {item.day} · {item.date} (主行程: {item.attractionName})</p>}
+            {mode === 'add' && <p className="modal-subtitle">{day === 0 ? '旅程資訊' : `Day ${day} · ${date}`}</p>}
           </div>
+          <button className="close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
 
-          <div className="form-group">
-            <label>時間</label>
-            <TimePicker.RangePicker
-              format="HH:mm"
-              minuteStep={5}
-              placeholder={['開始時間', '結束時間']}
-              allowEmpty={[true, true]}
-              value={[
-                form.startTime ? dayjs(form.startTime, 'HH:mm') : null,
-                form.endTime ? dayjs(form.endTime, 'HH:mm') : null
-              ]}
-              onChange={(dates, dateStrings) => {
-                setForm(prev => ({
-                  ...prev,
-                  startTime: dateStrings ? dateStrings[0] : '',
-                  endTime: dateStrings ? dateStrings[1] : ''
-                }))
-              }}
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.85rem',
-                borderRadius: '10px',
-                border: '1.5px solid rgba(0, 0, 0, 0.12)',
-                background: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '0.95rem'
-              }}
-            />
-          </div>
+        {/* Scrollable Body */}
+        <div className="form-modal-body">
+          <form className="schedule-form" id="scheduleForm" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>行程名稱 <span className="required">*</span></label>
+              <input
+                name="attractionName"
+                value={form.attractionName}
+                onChange={handleChange}
+                placeholder="例：清水寺 (景點)"
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label>備註</label>
-            <textarea
-              name="remark"
-              value={form.remark}
-              onChange={handleChange}
-              placeholder="補充說明、交通方式、注意事項..."
-              rows={3}
-            />
-          </div>
+            <div className="form-group">
+              <label>時間</label>
+              <TimePicker.RangePicker
+                format="HH:mm"
+                minuteStep={5}
+                placeholder={['開始時間', '結束時間']}
+                allowEmpty={[true, true]}
+                value={[
+                  form.startTime ? dayjs(form.startTime, 'HH:mm') : null,
+                  form.endTime ? dayjs(form.endTime, 'HH:mm') : null
+                ]}
+                onChange={(dates, dateStrings) => {
+                  setForm(prev => ({
+                    ...prev,
+                    startTime: dateStrings ? dateStrings[0] : '',
+                    endTime: dateStrings ? dateStrings[1] : ''
+                  }))
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.85rem',
+                  borderRadius: '10px',
+                  border: '1.5px solid rgba(0, 0, 0, 0.12)',
+                  background: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.95rem'
+                }}
+              />
+            </div>
 
-          <div className="form-group">
-            <label>Google Map 連結</label>
-            <input
-              name="googleMapLink"
-              value={form.googleMapLink}
-              onChange={handleChange}
-              placeholder="https://maps.app.goo.gl/..."
-            />
-          </div>
+            <div className="form-group">
+              <label>備註</label>
+              <textarea
+                name="remark"
+                value={form.remark}
+                onChange={handleChange}
+                placeholder="補充說明、交通方式、注意事項..."
+                rows={3}
+              />
+            </div>
 
-          {error && <p className="form-error">{error}</p>}
+            <div className="form-group">
+              <label>Google Map 連結</label>
+              <input
+                name="googleMapLink"
+                value={form.googleMapLink}
+                onChange={handleChange}
+                placeholder="https://maps.app.goo.gl/..."
+              />
+            </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn-cancel" onClick={onClose} disabled={isSaving}>
-              取消
-            </button>
-            <button type="submit" className="btn-save" disabled={isSaving}>
-              {isSaving ? <Loader size={16} className="spin-icon" /> : <Save size={16} />}
-              {isSaving ? '儲存中...' : '儲存'}
-            </button>
-          </div>
-        </form>
+            {error && <p className="form-error">{error}</p>}
+          </form>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="form-modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose} disabled={isSaving}>
+            取消
+          </button>
+          <button type="submit" form="scheduleForm" className="btn-save" disabled={isSaving}>
+            {isSaving ? <Loader size={16} className="spin-icon" /> : <Save size={16} />}
+            {isSaving ? '儲存中...' : '儲存'}
+          </button>
+        </div>
       </div>
     </div>,
     document.body

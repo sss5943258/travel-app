@@ -1,12 +1,24 @@
 // TripsService.gs
 
-function getTripDetails(tripId) {
+function getTripDetails(id) {
   const ss = getMySpreadsheet();
 
-  // 1. 找旅程基本資訊
+  // 1. 找旅程基本資訊：先用 tripId 找，找不到再用 readOnlyId 找
   const tripsData = parseSheetData(ss.getSheetByName(SHEET_TRIPS).getDataRange().getValues());
-  const trip = tripsData.find(t => t.tripId === tripId);
-  if (!trip) return { error: `找不到 tripId: ${tripId}` };
+
+  let trip = tripsData.find(t => t.tripId === id);
+  let isReadOnly = false;
+  let tripId = id; // 用於後續查詢 Schedules 的真實 tripId
+
+  if (!trip) {
+    trip = tripsData.find(t => t.readOnlyId === id);
+    if (trip) {
+      isReadOnly = true;
+      tripId = trip.tripId; // 取得真實 tripId 供後續使用
+    }
+  }
+
+  if (!trip) return { error: `找不到 tripId: ${id}` };
 
   // 2. 撈該旅程的所有行程，依 day 然後依 sortOrder 排序
   const allSchedules = parseSheetData(ss.getSheetByName(SHEET_SCHEDULES).getDataRange().getValues());
@@ -52,7 +64,7 @@ function getTripDetails(tripId) {
     const infoSheet = ss.getSheetByName(SHEET_TRIPS_INFO);
     if (infoSheet) {
       const allInfos = parseSheetData(infoSheet.getDataRange().getValues());
-      const foundInfo = allInfos.find(info => info.tripId === tripId);
+      const foundInfo = allInfos.find(info => String(info.tripId) === String(tripId));
       if (foundInfo) {
         tripInfo = Object.assign({}, defaultTripInfo, foundInfo);
       }
@@ -64,6 +76,8 @@ function getTripDetails(tripId) {
   // 5. 回傳
   return {
     tripId: trip.tripId,
+    readOnlyId: trip.readOnlyId || '',
+    isReadOnly: isReadOnly,
     name:   trip.name,
     startDate: trip.startDate,
     endDate:   trip.endDate,
