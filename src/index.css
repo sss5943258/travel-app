@@ -544,8 +544,13 @@ body::-webkit-scrollbar {
 }
 
 @keyframes lightboxFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .lightbox-img-wrap {
@@ -558,8 +563,15 @@ body::-webkit-scrollbar {
 }
 
 @keyframes lightboxImgIn {
-  from { transform: scale(0.88); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .lightbox-img {
@@ -857,23 +869,28 @@ body::-webkit-scrollbar {
 
 /* ─── HomePage ─────────────────────────────────────────────── */
 .home-container {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   padding: 2rem 1rem;
   background: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
 }
 
 .home-inner {
   width: 100%;
   max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .home-header {
   text-align: center;
-  margin-bottom: 2rem;
-  padding: 1.5rem 0;
+  margin-bottom: 1.5rem;
+  padding: 1rem 0 0;
+  flex-shrink: 0;
 }
 
 .home-logo-icon {
@@ -891,6 +908,34 @@ body::-webkit-scrollbar {
 .home-subtitle {
   font-size: 0.95rem;
   color: var(--text-muted);
+}
+
+/* 固定區：旅行攜帶清單 */
+.home-fixed-top {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+
+/* 可滾動的行程清單 */
+.home-trip-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-right: 2px; /* 避免 scrollbar 蓋到內容 */
+  scrollbar-width: none;
+  min-height: 0;
+}
+
+.home-trip-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* 置底：新增行程按鈕 */
+.home-fixed-bottom {
+  flex-shrink: 0;
+  margin-top: 0.75rem;
 }
 
 .home-buttons {
@@ -998,6 +1043,81 @@ body::-webkit-scrollbar {
   font-size: 0.95rem;
 }
 
+/* ─── Swipe-to-delete ─────────────────────────────────────── */
+.trip-swipe-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  flex-shrink: 0;
+}
+
+/* 行程按鈕本身：拖曳時不需要圓角 overflow clip，由外層負責 */
+.trip-swipe-item {
+  position: relative;
+  width: 100%;
+  border-radius: 16px;
+  /* transition 由 inline style 控制 */
+}
+
+/* 背景紅色刪除區塊 */
+.trip-delete-reveal {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #e53e3e;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 0.15s;
+  border-radius: 0 16px 16px 0;
+}
+
+.trip-delete-reveal:hover {
+  background: #c53030;
+}
+
+
+
+/* 新增行程按鈕 — 仿照 add-card 風格 */
+.home-add-trip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem 1.2rem;
+  border: 2px dashed rgba(255, 183, 197, 0.7);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.home-add-trip-btn:hover {
+  background: rgba(255, 183, 197, 0.2);
+  color: var(--primary-dark);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.home-add-trip-btn:active {
+  transform: translateY(0);
+}
+
+
+
 /* ─── Back Button (TripPage header) ───────────────────────── */
 .back-btn {
   background: rgba(255, 255, 255, 0.15);
@@ -1088,4 +1208,4 @@ body::-webkit-scrollbar {
 
 .flight-remark-wrap .remark-text {
   line-height: 1.5;
-}
+}

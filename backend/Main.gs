@@ -69,6 +69,11 @@ function doPost(e) {
     }
 
     // 新增 CRUD
+    case 'addTrip':
+      return createJsonResponse(addTrip(payload));
+    case 'deleteTrip':
+      if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
+      return createJsonResponse(deleteTrip(payload));
     case 'addSchedule':
       if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
       return createJsonResponse(addSchedule(payload));
