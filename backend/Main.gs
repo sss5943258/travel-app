@@ -17,6 +17,9 @@ function doGet(e) {
     const tripDetails = getTripDetails(targetTripId);
     return createJsonResponse(tripDetails);
   }
+  else if (action === 'getPackingItems') {
+    return createJsonResponse(getPackingItems());
+  }
   
   return createJsonResponse({ error: "未知的 action 參數" });
 }
@@ -92,6 +95,14 @@ function doPost(e) {
     case 'uploadTripImage':
       if (!isValidEditTripId(payload.tripId)) return createJsonResponse({ status: 'error', message: '無編輯權限' });
       return createJsonResponse(uploadTripImage(payload));
+
+    // Packing List
+    case 'addPackingItem':
+      return createJsonResponse(addPackingItem(payload));
+    case 'deletePackingItem':
+      return createJsonResponse(deletePackingItem(payload));
+    case 'togglePackingItem':
+      return createJsonResponse(togglePackingItem(payload));
 
     default:
       return createJsonResponse({ status: 'error', message: '未知的 action' });

@@ -5,6 +5,7 @@ import ScheduleFormModal from './components/ScheduleFormModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import TripInfoFormModal from './components/TripInfoFormModal'
 import HomePage from './components/HomePage'
+import PackingListPage from './components/PackingListPage'
 import { API_URL } from './config'
 import { cachedFetch } from './utils/api'
 import './index.css'
@@ -323,6 +324,7 @@ function App() {
   const getIdFromUrl = () => new URLSearchParams(window.location.search).get('id')
 
   const [activeTripId, setActiveTripId] = useState(getIdFromUrl)
+  const [showPackingList, setShowPackingList] = useState(false)
 
   // Listen for browser back / forward navigation.
   useEffect(() => {
@@ -339,8 +341,7 @@ function App() {
   }
 
   const handleOpenPackingList = () => {
-    // TODO: 攜帶清單頁面
-    alert('攜帶清單功能即將推出！')
+    setShowPackingList(true)
   }
 
   const handleBackToHome = () => {
@@ -348,6 +349,10 @@ function App() {
     url.searchParams.delete('id')
     window.history.pushState({}, '', url)
     setActiveTripId(null)
+  }
+
+  if (showPackingList) {
+    return <PackingListPage onBack={() => setShowPackingList(false)} />
   }
 
   if (!activeTripId) {

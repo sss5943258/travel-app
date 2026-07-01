@@ -1,6 +1,7 @@
 const SHEET_TRIPS = 'Trips';
 const SHEET_SCHEDULES = 'Schedules';
 const SHEET_TRIPS_INFO = 'Trips_Info';
+const SHEET_PACKING_ITEMS = 'Packing_Items';
 
 // 👑 Google Drive 資料夾 ID（用來儲存上傳的圖片）
 // 請在 Google Drive 建立資料夾 → 右鍵「共用」→「知道連結的人皆可查看」→ 複製資料夾 ID 貼到這裡
