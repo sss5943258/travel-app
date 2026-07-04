@@ -130,15 +130,15 @@ export default function PackingListPage({ onBack }) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}?action=getPackingItems`)
+      const res = await fetch(`${API_URL}/packingitems`)
       if (!res.ok) throw new Error('網路請求失敗')
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      // GAS 回傳 isEssential / checked 是字串 'TRUE'/'FALSE'，統一轉 boolean
+      // 確保 isEssential 和 checked 為 boolean
       const normalized = (Array.isArray(data) ? data : []).map((item) => ({
         ...item,
-        isEssential: String(item.isEssential).toUpperCase() === 'TRUE',
-        checked: String(item.checked).toUpperCase() === 'TRUE',
+        isEssential: typeof item.isEssential === 'boolean' ? item.isEssential : String(item.isEssential).toUpperCase() === 'TRUE',
+        checked: typeof item.checked === 'boolean' ? item.checked : String(item.checked).toUpperCase() === 'TRUE',
       }))
       setItems(normalized)
     } catch (err) {
@@ -154,13 +154,12 @@ export default function PackingListPage({ onBack }) {
   const handleAdd = async ({ name, isEssential }) => {
     setIsSaving(true)
     try {
-      const res = await cachedFetch(API_URL, {
+      const res = await cachedFetch(`${API_URL}/packingitems`, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'addPackingItem', name, isEssential }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, isEssential }),
       })
-      // no-cors → 直接 refetch
+      if (!res.ok) throw new Error('新增失敗')
       await fetchItems()
       setShowAddModal(false)
     } catch (err) {
@@ -178,12 +177,12 @@ export default function PackingListPage({ onBack }) {
       prev.map((i) => (i.itemId === item.itemId ? { ...i, checked: newChecked } : i))
     )
     try {
-      await cachedFetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'togglePackingItem', itemId: item.itemId, checked: newChecked }),
+      const res = await cachedFetch(`${API_URL}/packingitems/${item.itemId}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checked: newChecked }),
       })
+      if (!res.ok) throw new Error('更新失敗')
     } catch (err) {
       // rollback
       setItems((prev) =>
@@ -195,12 +194,10 @@ export default function PackingListPage({ onBack }) {
 
   // ── 刪除（交給 DeleteConfirmModal 執行） ──────────────────────
   const handleDeleteConfirm = async () => {
-    await cachedFetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'deletePackingItem', itemId: deletingItem.itemId }),
+    const res = await cachedFetch(`${API_URL}/packingitems/${deletingItem.itemId}`, {
+      method: 'DELETE',
     })
+    if (!res.ok) throw new Error('刪除失敗')
   }
 
   const handleDeleteDone = () => {

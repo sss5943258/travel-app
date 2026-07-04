@@ -144,7 +144,7 @@ function HomePage({ onSelectTrip, onOpenPackingList }) {
   const fetchTrips = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`${API_URL}?action=getTrips`)
+      const res = await fetch(`${API_URL}/trips`)
       if (!res.ok) throw new Error('網路請求發生錯誤')
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -170,11 +170,10 @@ function HomePage({ onSelectTrip, onOpenPackingList }) {
   }
 
   const handleDeleteConfirm = async () => {
-    await cachedFetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'deleteTrip', tripId: deletingTrip.tripId }),
+    const res = await cachedFetch(`${API_URL}/trips/${deletingTrip.tripId}`, {
+      method: 'DELETE',
     })
+    if (!res.ok) throw new Error('刪除失敗')
   }
 
   const handleDeletedDone = () => {

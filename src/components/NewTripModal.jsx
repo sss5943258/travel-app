@@ -26,10 +26,10 @@ export default function NewTripModal({ onClose, onCreated }) {
     setIsSaving(true)
     setError(null)
     try {
-      const res = await cachedFetch(API_URL, {
+      const res = await cachedFetch(`${API_URL}/trips`, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'addTrip', ...form }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
       const data = await res.json()
       if (data.error || data.status === 'error') throw new Error(data.error || data.message)

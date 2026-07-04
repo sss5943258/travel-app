@@ -432,16 +432,16 @@ function TripPage({ tripId, onBack }) {
     })
 
     try {
-      await cachedFetch(`${API_URL}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+      const res = await cachedFetch(`${API_URL}/schedules/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'updateScheduleOrder',
           tripId: tripId,
           day: selectedDay,
-          orderedIds: newGroupOrder
+          orderedGroupIds: newGroupOrder
         })
       })
+      if (!res.ok) throw new Error('更新排序失敗')
     } catch (err) {
       console.error('更新順序失敗:', err)
     }
@@ -451,7 +451,7 @@ function TripPage({ tripId, onBack }) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await cachedFetch(`${API_URL}?action=getTripDetails&tripId=${tripId}`)
+      const res = await cachedFetch(`${API_URL}/trips/${tripId}`)
       if (!res.ok) throw new Error('網路請求發生錯誤')
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -1033,15 +1033,12 @@ function TripPage({ tripId, onBack }) {
               dataToClear.tripRemark = '';
             }
 
-            await cachedFetch(API_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain' },
-              body: JSON.stringify({
-                action: 'updateTripInfo',
-                tripId,
-                data: dataToClear
-              })
+            const res = await cachedFetch(`${API_URL}/trips/${tripId}/info`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(dataToClear)
             });
+            if (!res.ok) throw new Error('清除失敗');
 
             setTripsInfo(prev => ({
               ...prev,

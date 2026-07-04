@@ -54,24 +54,28 @@ export default function ScheduleFormModal({ mode, item, day, date, groupId, altO
 
       const isPlaceholder = isEdit && item?.isDefaultPlaceholder;
 
-      const body = (isEdit && !isPlaceholder)
-        ? { action: 'updateSchedule', id: item.id, ...form }
-        : {
-            action: 'addSchedule',
+      if (isEdit && !isPlaceholder) {
+        const res = await cachedFetch(`${API_URL}/schedules/${item.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        if (!res.ok) throw new Error('儲存失敗')
+      } else {
+        const res = await cachedFetch(`${API_URL}/schedules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             tripId,
-            id: isEdit ? item.id : undefined,
             day: targetDay,
             date: targetDate,
-            groupId: isEdit ? item.groupId : (groupId || undefined),
+            groupId: isEdit ? item.groupId : (groupId || null),
             altOrder: isEdit ? item.altOrder : (altOrder || 0),
             ...form
-          }
-
-      await cachedFetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(body),
-      })
+          }),
+        })
+        if (!res.ok) throw new Error('新增失敗')
+      }
 
       const newItem = {
         ...form,

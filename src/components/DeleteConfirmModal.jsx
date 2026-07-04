@@ -15,12 +15,10 @@ export default function DeleteConfirmModal({ item, onClose, onDeleted, onConfirm
       if (onConfirm) {
         await onConfirm();
       } else {
-        await cachedFetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'deleteSchedule', id: item.id }),
+        const res = await cachedFetch(`${API_URL}/schedules/${item.id}`, {
+          method: 'DELETE',
         })
+        if (!res.ok) throw new Error('刪除失敗')
       }
       
       // no-cors 下直接假設成功

@@ -136,37 +136,25 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
     }
   }
 
-  // 上傳圖片到 Google Drive
+  // 上傳圖片到本地伺服器
   const uploadImage = async (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = async (ev) => {
         try {
           const base64 = ev.target.result
-          const res = await cachedFetch(API_URL, {
+          const res = await cachedFetch(`${API_URL}/trips/${tripId}/info/upload`, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              action: 'uploadTripImage',
-              tripId,
               type: prefix,
               imageBase64: base64,
               fileName: `${tripId}_${prefix}_${Date.now()}.${file.name.split('.').pop()}`
             })
           })
 
-          const responseText = await res.text()
-          let result = {}
-          try {
-            result = JSON.parse(responseText)
-          } catch (parseErr) {
-            // Fallback
-          }
-
-          if (result.status === 'error') {
-            throw new Error(result.message || '圖片上傳失敗')
-          }
-
+          if (!res.ok) throw new Error('圖片上傳失敗')
+          const result = await res.json()
           resolve(result)
         } catch (err) {
           reject(err)
@@ -185,13 +173,25 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
     let updateData = {}
     if (isFlight) {
       updateData = {
-        [`${prefix}FlightNo`]: form.flightNo,
-        [`${prefix}Airline`]: form.airline,
-        [`${prefix}DepartureTime`]: fromDatetimeLocal(form.departureTime),
-        [`${prefix}ArrivalTime`]: fromDatetimeLocal(form.arrivalTime),
-        [`${prefix}DepAirport`]: form.depAirport,
-        [`${prefix}ArrAirport`]: form.arrAirport,
-        [`${prefix}FlightRemark`]: form.flightRemark
+        outboundFlightNo: form.flightNo,
+        outboundAirline: form.airline,
+        outboundDepartureTime: fromDatetimeLocal(form.departureTime),
+        outboundArrivalTime: fromDatetimeLocal(form.arrivalTime),
+        outboundDepAirport: form.depAirport,
+        outboundArrAirport: form.arrAirport,
+        outboundFlightRemark: form.flightRemark
+      }
+      // 如果不是 outbound，要換成 inbound 欄位名稱
+      if (prefix === 'inbound') {
+        updateData = {
+          inboundFlightNo: form.flightNo,
+          inboundAirline: form.airline,
+          inboundDepartureTime: fromDatetimeLocal(form.departureTime),
+          inboundArrivalTime: fromDatetimeLocal(form.arrivalTime),
+          inboundDepAirport: form.depAirport,
+          inboundArrAirport: form.arrAirport,
+          inboundFlightRemark: form.flightRemark
+        }
       }
     } else {
       updateData = {
@@ -209,33 +209,18 @@ export default function TripInfoFormModal({ type, tripId, initialData, onClose, 
         }
         setIsUploading(false)
       }
-      // 如果移除了圖片（原本有但現在沒有了）
+      // 如果移成了圖片（原本有但現在沒有了）
       else if (existingImageUrl === null && initialData?.[`${prefix}ImageUrl`]) {
         updateData[`${prefix}ImageUrl`] = ''
       }
 
-      const res = await cachedFetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          action: 'updateTripInfo',
-          tripId,
-          data: updateData
-        }),
+      const res = await cachedFetch(`${API_URL}/trips/${tripId}/info`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
       })
 
-      // Since Apps Script might return redirect or text, verify if we can parse it
-      const responseText = await res.text()
-      let result = {}
-      try {
-        result = JSON.parse(responseText)
-      } catch (parseErr) {
-        // Fallback for non-cors/redirects
-      }
-
-      if (result.status === 'error') {
-        throw new Error(result.message || '更新失敗')
-      }
+      if (!res.ok) throw new Error('更新失敗')
 
       onSaved(updateData)
     } catch (err) {
